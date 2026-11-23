@@ -1,0 +1,18 @@
+{
+  "dependencies": {
+    "com.unity.inputsystem": "1.11.2",
+    "com.unity.xr.interaction.toolkit": "3.2.2",
+    "com.unity.xr.management": "4.5.3",
+    "com.unity.xr.openxr": "1.16.1",
+    "com.unity.xr.openxr.picoxr": "https://github.com/Pico-Developer/PICO-Unity-OpenXR-SDK.git#3aa3e62bff41df618529eeb60ff02c29a515dafe",
+    "com.unity.modules.androidjni": "1.0.0",
+    "com.unity.modules.animation": "1.0.0",
+    "com.unity.modules.audio": "1.0.0",
+    "com.unity.modules.jsonserialize": "1.0.0",
+    "com.unity.modules.physics": "1.0.0",
+    "com.unity.modules.ui": "1.0.0",
+    "com.unity.modules.unitywebrequest": "1.0.0",
+    "com.unity.modules.unitywebrequesttexture": "1.0.0",
+    "com.unity.modules.xr": "1.0.0"
+  }
+}

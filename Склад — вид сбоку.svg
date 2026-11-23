@@ -1,0 +1,74 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="555" viewBox="0 0 1000 555" role="img" aria-labelledby="title description">
+  <title id="title">Склад — вид сбоку</title>
+  <desc id="description">Из старта игрок подходит к гире и кнопке. Через вентиляцию он попадает на полку, откуда видит ящик на полу. Ящик поднимается в паз, после чего открывается переход на балкон.</desc>
+  <defs>
+    <marker id="route-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0l10 5-10 5z" fill="#146574"/>
+    </marker>
+    <marker id="box-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0 0l10 5-10 5z" fill="#a24b1d"/>
+    </marker>
+    <pattern id="grate" width="6" height="8" patternUnits="userSpaceOnUse">
+      <path d="M2 0v8" stroke="#667586" stroke-width="2"/>
+    </pattern>
+    <style>
+      text { font-family: system-ui, sans-serif; fill: #192a3a; }
+      .label { font-size: 15px; font-weight: 650; }
+      .note { font-size: 13px; fill: #46586a; }
+      .wall { fill: none; stroke: #425466; stroke-width: 3; }
+      .datum { stroke: #91a1b0; stroke-width: 1; stroke-dasharray: 4 5; }
+      .route { fill: none; stroke: #146574; stroke-width: 3; marker-end: url(#route-arrow); }
+      .sight { fill: none; stroke: #6554a6; stroke-width: 2; stroke-dasharray: 4 5; }
+      .lift { fill: none; stroke: #a24b1d; stroke-width: 3; marker-end: url(#box-arrow); }
+    </style>
+  </defs>
+  <rect width="1000" height="555" fill="#f3f6f7"/>
+  <text x="54" y="58" font-size="33" font-weight="750">Склад — вид сбоку</text>
+  <text class="note" x="55" y="88">Ориентиры для первой расстановки примитивов. Габариты и углы уточняются в шлеме.</text>
+
+  <rect x="110" y="115" width="810" height="320" rx="3" fill="#fff"/>
+  <path class="datum" d="M87 270h837"/>
+  <path class="wall" d="M110 115v320h810V115"/>
+  <text class="note" x="99" y="274" text-anchor="end">1,65 м</text>
+  <text class="note" x="99" y="439" text-anchor="end">0 м</text>
+
+  <path class="route" d="M165 395h71"/>
+  <text class="label" x="144" y="415">Старт</text>
+  <rect x="248" y="426" width="44" height="8" rx="2" fill="#a24b1d"/>
+  <path d="M253 424l3-24h28l3 24zM263 400v-8h14v8" fill="#667586" stroke="#46586a" stroke-width="2" stroke-linejoin="round"/>
+  <text class="label" x="270" y="378" text-anchor="middle">Гиря</text>
+  <text class="note" x="270" y="458" text-anchor="middle">Кнопка</text>
+
+  <path d="M338 434v-72h41v72" fill="#eef2f4" stroke="#667586" stroke-width="3"/>
+  <rect x="341" y="365" width="35" height="68" fill="url(#grate)"/>
+  <path class="route" d="M360 352v-56q0-50 47-50h61" stroke-dasharray="7 6"/>
+  <text class="label" x="330" y="318" text-anchor="end">Вентиляция</text>
+  <text class="note" x="359" y="458" text-anchor="middle">Решётка</text>
+
+  <path d="M445 270h143v15H445zM735 270h185v15H735z" fill="#53677a"/>
+  <text class="label" x="484" y="261">Полка</text>
+  <text class="label" x="759" y="260">Балкон</text>
+  <circle cx="562" cy="214" r="6" fill="#6554a6"/>
+  <path class="sight" d="M562 214l101 177"/>
+  <text class="note" x="565" y="348" text-anchor="end">Прицеливание</text>
+
+  <rect x="638" y="383" width="52" height="52" rx="3" fill="#f8dfc7" stroke="#a24b1d" stroke-width="2"/>
+  <text class="label" x="664" y="415" text-anchor="middle">Ящик</text>
+  <path class="lift" d="M664 378v-78"/>
+  <rect x="638" y="270" width="52" height="17" rx="2" fill="#fff0dd" stroke="#a24b1d" stroke-width="2" stroke-dasharray="4 3"/>
+  <path d="M632 270v23h64v-23" fill="none" stroke="#53677a" stroke-width="4" stroke-linecap="round"/>
+  <text class="label" x="665" y="258" text-anchor="middle">Паз</text>
+
+  <path class="route" d="M594 206q68-65 144 0" stroke-dasharray="7 6"/>
+  <text class="note" x="663" y="147" text-anchor="middle">Телепорт после фиксации ящика</text>
+  <path d="M870 270v-99h34v99" fill="#e1edf0" stroke="#146574" stroke-width="2"/>
+  <circle cx="893" cy="226" r="2" fill="#146574"/>
+  <text class="label" x="887" y="158" text-anchor="middle">Выход</text>
+
+  <path class="route" d="M112 504h32"/>
+  <text class="note" x="158" y="509">Маршрут игрока</text>
+  <path class="lift" d="M307 504h32"/>
+  <text class="note" x="353" y="509">Подъём ящика</text>
+  <path class="sight" d="M490 504h34"/>
+  <text class="note" x="538" y="509">Линия прицеливания</text>
+</svg>

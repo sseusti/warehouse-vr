@@ -32,10 +32,14 @@ namespace Warehouse
         public BoxCollider exitZone;
         public TextMesh exitSign;
 
+        [Header("Remote effects")]
+        [SerializeField] private PlayerScaler scaler;
+
         const float AimRange = 7f;
         const float LiftSpeed = 1.4f;
         static readonly Color AimColor = new(0.73f, 0.81f, 0.9f, 0.55f);
         static readonly Color TargetColor = new(1f, 0.78f, 0.27f);
+        static readonly Color ForbiddenColor = new(0.95f, 0.25f, 0.2f);
 
         enum Stage { Weight, Vent, Arriving, Box, Lifting, Balcony, Complete }
         enum RemoteMode { Size, Gravity }
@@ -44,21 +48,20 @@ namespace Warehouse
         WarehouseOverlay overlay;
         InputAction switchMode;
         bool restarting;
+        float aimWidth;
 
-        Vector3 PlayerFloor
-        {
-            get
-            {
-                Vector3 floor = player.Camera.transform.position;
-                floor.y = player.Origin.transform.position.y;
-                return floor;
-            }
-        }
+        Vector3 PlayerFloor => scaler.Floor;
+
+        bool SelfTargetAvailable => mode == RemoteMode.Size && !scaler.IsChanging &&
+            stage is Stage.Vent or Stage.Box or Stage.Lifting or Stage.Balcony;
+
+        public void ConfigureScaler(PlayerScaler value) => scaler = value;
 
         void Awake()
         {
             balconyPad.gameObject.SetActive(false);
             aimLine.enabled = false;
+            aimWidth = aimLine.widthMultiplier;
             if (leftController == null)
                 leftController = player.CameraFloorOffsetObject.transform.Find("Left Controller");
             overlay = new WarehouseOverlay(player.Camera, transform);
@@ -69,12 +72,14 @@ namespace Warehouse
 
         void OnEnable()
         {
+            scaler.Changed += RefreshHint;
             overlay.EnableShortcut();
             switchMode.Enable();
         }
 
         void OnDisable()
         {
+            scaler.Changed -= RefreshHint;
             overlay.DisableShortcut();
             switchMode.Disable();
         }
@@ -127,7 +132,7 @@ namespace Warehouse
                     LiftBox();
                     break;
                 case Stage.Balcony:
-                    if (exitZone.bounds.Contains(PlayerFloor))
+                    if (scaler.IsNormalSize && exitZone.bounds.Contains(PlayerFloor))
                     {
                         balconyPad.enabled = false;
                         exitSign.text = "COMPLETE";
@@ -162,25 +167,43 @@ namespace Warehouse
             if (shortcut || (onHintToggle && pressed))
                 overlay.Toggle();
 
-            aimLine.enabled = target != null || onButton || complete;
-            bool hitScene = Physics.Raycast(origin, direction, out RaycastHit result, AimRange,
+            bool selfAvailable = SelfTargetAvailable;
+            aimLine.enabled = target != null || onButton || complete || selfAvailable;
+            aimLine.widthMultiplier = aimWidth * scaler.Scale;
+            var ray = new Ray(origin, direction);
+            bool hitScene = Physics.Raycast(ray, out RaycastHit result, AimRange,
                 Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore);
+            float selfDistance = 0f;
+            bool onSelf = overlayHit == WarehouseOverlay.Hit.None && selfAvailable &&
+                scaler.RayHitsSelf(ray, out selfDistance) && selfDistance <= AimRange &&
+                (!hitScene || result.distance > selfDistance - 0.05f);
+            scaler.ShowSelfTarget(selfAvailable, onSelf);
+
             bool modeMatches = stage switch
             {
                 Stage.Weight => mode == RemoteMode.Size,
                 Stage.Box => mode == RemoteMode.Gravity,
                 _ => true,
             };
-            bool onTarget = overlayHit == WarehouseOverlay.Hit.None && modeMatches && hitScene && result.collider == target;
+            bool onCollider = overlayHit == WarehouseOverlay.Hit.None && !onSelf && hitScene && result.collider == target;
+            bool forbidden = onCollider && stage == Stage.Vent && !scaler.FitsVent;
+            bool onTarget = onCollider && modeMatches && !forbidden && !scaler.IsChanging;
             pressurePlate.SetHighlighted(stage == Stage.Weight && onTarget);
 
             Vector3 end = hitScene ? result.point : origin + direction * AimRange;
+            if (onSelf)
+                end = ray.GetPoint(selfDistance);
             if (overlayHit != WarehouseOverlay.Hit.None)
                 end = overlayPoint;
             aimLine.SetPosition(0, origin);
             aimLine.SetPosition(1, end);
-            aimLine.startColor = aimLine.endColor = onTarget || onButton ? TargetColor : AimColor;
-            if (onTarget && pressed && !shortcut)
+            aimLine.startColor = aimLine.endColor = forbidden ? ForbiddenColor
+                : onTarget || onButton || onSelf ? TargetColor : AimColor;
+            if (!pressed || shortcut)
+                return;
+            if (onSelf)
+                scaler.ChangeToNextStep();
+            else if (onTarget)
                 ActivateTarget();
         }
 
@@ -203,8 +226,16 @@ namespace Warehouse
                 Stage.Weight when mode != RemoteMode.Size =>
                     ("Уменьши гирю", "Нажми A для режима «Размер». Наведи луч на гирю и нажми курок."),
                 Stage.Weight => ("Уменьши гирю", "Наведи правый луч на гирю и нажми курок."),
-                Stage.Vent => ("Пройди через вентиляцию", "Левым стиком переместись к решётке. Наведи правый луч на проём и нажми курок."),
+                Stage.Vent when !scaler.FitsVent && mode != RemoteMode.Size =>
+                    ("Стань меньше", "Нажми A для режима «Размер». Наведи луч на кольцо у себя под ногами и нажми курок."),
+                Stage.Vent when !scaler.FitsVent =>
+                    ("Стань меньше", "Подойди к решётке. Наведи луч на кольцо у себя под ногами и нажми курок."),
+                Stage.Vent => ("Пройди через вентиляцию", "Подойди к решётке. Наведи правый луч на проём и нажми курок."),
                 Stage.Arriving => ("Переход на полку", ""),
+                Stage.Box or Stage.Balcony when !scaler.IsNormalSize && mode != RemoteMode.Size =>
+                    ("Верни свой размер", "Нажми A для режима «Размер». Наведи луч на кольцо под ногами и нажми курок."),
+                Stage.Box or Stage.Balcony when !scaler.IsNormalSize =>
+                    ("Верни свой размер", "Наведи луч на кольцо у себя под ногами и нажимай курок, пока не станешь прежним."),
                 Stage.Box when mode != RemoteMode.Gravity =>
                     ("Подними ящик", "Нажми A для режима «Гравитация». Наведи луч на ящик и нажми курок."),
                 Stage.Box => ("Подними ящик", "Наведи правый луч на ящик внизу и нажми курок."),

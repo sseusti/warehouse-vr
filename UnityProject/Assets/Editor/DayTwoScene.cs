@@ -16,6 +16,7 @@ namespace Warehouse.Editor
     {
         const string Folder = "Assets/Day2";
         public const string ScenePath = Folder + "/Warehouse.unity";
+        const string ScaleSettingsPath = Folder + "/PlayerScaleSettings.asset";
         const float PlatformHeight = 1.65f;
 
         [MenuItem("Warehouse/Open Day 2 Warehouse")]
@@ -26,6 +27,18 @@ namespace Warehouse.Editor
 
             EnsureScene();
             EditorSceneManager.OpenScene(ScenePath);
+        }
+
+        [MenuItem("Warehouse/Rebuild Day 2 Warehouse")]
+        public static void Rebuild()
+        {
+            if (!EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo())
+                return;
+
+            EditorSceneManager.NewScene(NewSceneSetup.EmptyScene);
+            // Keep the .meta file so the scene GUID stays the same after a rebuild.
+            File.Delete(ScenePath);
+            EnsureScene();
         }
 
         public static void EnsureScene()
@@ -54,7 +67,8 @@ namespace Warehouse.Editor
             route.rightController = rig.transform.Find("Camera Offset/Right Controller");
             var input = rig.GetComponent<InputActionManager>().actionAssets[0];
             route.activate = Action(input, "XRI Right Interaction/Activate");
-            rig.GetComponentInChildren<XRRayInteractor>().velocity = 8f;
+            var teleportRay = rig.GetComponentInChildren<XRRayInteractor>();
+            teleportRay.velocity = 8f;
 
             route.aimLine = new GameObject("Right Controller Aim").AddComponent<LineRenderer>();
             route.aimLine.transform.SetParent(route.rightController, false);
@@ -68,6 +82,9 @@ namespace Warehouse.Editor
             var steel = Material("Platform", new Color(0.35f, 0.51f, 0.64f));
             var target = Material("Target", new Color(0.94f, 0.57f, 0.18f));
             var pad = Material("Teleport Pad", new Color(0.10f, 0.67f, 0.54f));
+            var scaler = rig.AddComponent<PlayerScaler>();
+            scaler.Configure(route.player, ScaleSettings(), teleportRay, target);
+            route.ConfigureScaler(scaler);
 
             CreateBlock("Warehouse Floor", new Vector3(0f, -0.1f, 0f), new Vector3(10f, 0.2f, 6f), floor);
             CreateBlock("Back Wall", new Vector3(0f, 2.15f, 3f), new Vector3(10f, 4.3f, 0.15f), wall);
@@ -153,6 +170,17 @@ namespace Warehouse.Editor
             route.pressurePlate = plate.AddComponent<WeightPressurePlate>();
             route.pressurePlate.Configure(weight, button.transform);
             weightSign.text = "SHRINK\nRIGHT TRIGGER";
+        }
+
+        static PlayerScaleSettings ScaleSettings()
+        {
+            var settings = AssetDatabase.LoadAssetAtPath<PlayerScaleSettings>(ScaleSettingsPath);
+            if (settings != null)
+                return settings;
+
+            settings = ScriptableObject.CreateInstance<PlayerScaleSettings>();
+            AssetDatabase.CreateAsset(settings, ScaleSettingsPath);
+            return settings;
         }
 
         static UnityEngine.Material Material(string name, Color color, string shader = "Standard")

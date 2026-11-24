@@ -20,6 +20,7 @@ namespace Warehouse.Editor
         const string ScaleSettingsPath = Folder + "/PlayerScaleSettings.asset";
         const string GravityPresetsPath = Folder + "/GravityPresets.asset";
         const string FeedbackSettingsPath = Folder + "/RemoteFeedbackSettings.asset";
+        const string PlateSettingsPath = Folder + "/PressurePlateSettings.asset";
         const float BoxYaw = 103f;
         const float BoxMass = 20f;
         const float PlatformHeight = 1.65f;
@@ -184,6 +185,8 @@ namespace Warehouse.Editor
             weight.useGravity = false;
             route.pressurePlate = plate.AddComponent<WeightPressurePlate>();
             route.pressurePlate.Configure(weight, button.transform);
+            var readout = Sign("Weight Readout", "", weightSign.transform.position + Vector3.up * 0.39f);
+            route.pressurePlate.ConfigureReadout(LoadOrCreate<PressurePlateSettings>(PlateSettingsPath), readout);
             weightSign.text = "SHRINK\nRIGHT TRIGGER";
         }
 

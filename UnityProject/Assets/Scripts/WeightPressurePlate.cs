@@ -1,3 +1,4 @@
+using System.Globalization;
 using UnityEngine;
 
 namespace Warehouse
@@ -6,13 +7,12 @@ namespace Warehouse
     {
         [SerializeField] Rigidbody weight;
         [SerializeField] Transform button;
+        [SerializeField] private PressurePlateSettings settings;
+        [SerializeField] private TextMesh readout;
 
-        public const float SmallScale = 0.5f;
-        const float ReleaseMass = 2f;
-        const float ShrinkDuration = 0.4f;
-        const float ButtonTravel = 0.08f;
-        const float ButtonDuration = 0.18f;
         static readonly int ColorProperty = Shader.PropertyToID("_Color");
+        static readonly Color HeavyColor = new(1f, 0.45f, 0.38f);
+        static readonly Color LightColor = new(0.45f, 1f, 0.65f);
 
         Vector3 fullScale;
         Vector3 weightStart;
@@ -26,13 +26,21 @@ namespace Warehouse
         Renderer weightRenderer;
         MaterialPropertyBlock weightProperties;
         bool highlighted;
+        float shownMass = -1f;
 
-        public bool IsReleased => weight.mass < ReleaseMass && rise == 1f;
+        public bool IsReleased => weight.mass < settings.ReleaseMass && rise == 1f;
+        public float ShrinkScale => settings.ShrinkScale;
 
         public void Configure(Rigidbody body, Transform plunger)
         {
             weight = body;
             button = plunger;
+        }
+
+        public void ConfigureReadout(PressurePlateSettings values, TextMesh label)
+        {
+            settings = values;
+            readout = label;
         }
 
         void Awake()
@@ -45,6 +53,7 @@ namespace Warehouse
             buttonScale = button.localScale;
             weightRenderer = weight.GetComponent<Renderer>();
             weightProperties = new MaterialPropertyBlock();
+            UpdateReadout();
         }
 
         public void Shrink()
@@ -66,20 +75,41 @@ namespace Warehouse
 
         void Update()
         {
-            if (!shrinkRequested || IsReleased && scale == SmallScale)
+            float target = settings.ShrinkScale;
+            if (!shrinkRequested || IsReleased && scale == target)
                 return;
 
-            scale = Mathf.MoveTowards(scale, SmallScale, (1f - SmallScale) * Time.deltaTime / ShrinkDuration);
+            scale = Mathf.MoveTowards(scale, target, (1f - target) * Time.deltaTime / settings.ShrinkDuration);
             weight.transform.localScale = fullScale * scale;
             weight.mass = fullMass * scale * scale * scale;
+            UpdateReadout();
 
-            if (weight.mass < ReleaseMass)
-                rise = Mathf.MoveTowards(rise, 1f, Time.deltaTime / ButtonDuration);
+            if (weight.mass < settings.ReleaseMass)
+                rise = Mathf.MoveTowards(rise, 1f, Time.deltaTime / settings.ButtonDuration);
 
-            float lifted = ButtonTravel * rise;
+            float lifted = settings.ButtonTravel * rise;
             button.localScale = buttonScale + Vector3.up * lifted;
             button.position = buttonStart + Vector3.up * (lifted * 0.5f);
             weight.position = weightStart + Vector3.up * (lifted - weightHalfHeight * (1f - scale));
         }
+
+        void UpdateReadout()
+        {
+            if (readout == null)
+                return;
+
+            // Text changes only while the shown value changes, so the string is rebuilt rarely.
+            float mass = Mathf.Round(weight.mass * 10f) / 10f;
+            if (mass == shownMass)
+                return;
+
+            shownMass = mass;
+            bool light = weight.mass < settings.ReleaseMass;
+            readout.text = $"Гиря {Kilograms(mass)} кг\nнужно < {Kilograms(settings.ReleaseMass)} кг";
+            readout.color = light ? LightColor : HeavyColor;
+        }
+
+        static string Kilograms(float value) =>
+            value.ToString("0.0", CultureInfo.InvariantCulture).Replace('.', ',');
     }
 }

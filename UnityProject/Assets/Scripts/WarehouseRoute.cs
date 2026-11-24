@@ -291,7 +291,7 @@ namespace Warehouse
             {
                 case Stage.Weight:
                     pressurePlate.Shrink();
-                    feedback.Applied(point, feedback.PitchForScale(WeightPressurePlate.SmallScale));
+                    feedback.Applied(point, feedback.PitchForScale(pressurePlate.ShrinkScale));
                     break;
                 case Stage.Vent:
                     startPad.enabled = false;

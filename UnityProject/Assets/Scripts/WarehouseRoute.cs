@@ -1,6 +1,7 @@
 using Unity.XR.CoreUtils;
 using UnityEngine;
 using UnityEngine.InputSystem;
+using UnityEngine.SceneManagement;
 using UnityEngine.XR.Interaction.Toolkit.Locomotion.Teleportation;
 
 namespace Warehouse
@@ -16,6 +17,7 @@ namespace Warehouse
 
         [Header("Ground floor")]
         public Collider weight;
+        public WeightPressurePlate pressurePlate;
         public GameObject grate;
         public Collider vent;
         public TeleportationArea startPad;
@@ -36,6 +38,8 @@ namespace Warehouse
 
         enum Stage { Weight, Vent, Arriving, Box, Lifting, Balcony, Complete }
         Stage stage;
+        WarehouseHints hints;
+        bool restarting;
 
         Vector3 PlayerFloor
         {
@@ -51,7 +55,13 @@ namespace Warehouse
         {
             balconyPad.gameObject.SetActive(false);
             aimLine.enabled = false;
+            hints = new WarehouseHints(player.Camera, transform);
+            SetStage(Stage.Weight);
         }
+
+        void OnEnable() => hints.EnableShortcut();
+        void OnDisable() => hints.DisableShortcut();
+        void OnDestroy() => hints.Dispose();
 
         void LateUpdate()
         {
@@ -62,15 +72,22 @@ namespace Warehouse
                 Stage.Box => box,
                 _ => null,
             };
-            aimLine.enabled = target != null;
-            if (target != null && AimAt(target) && activate.action.WasPressedThisFrame())
-                ActivateTarget();
+            hints.Place(player.Camera.transform);
+            AimAndActivate(target);
 
             switch (stage)
             {
+                case Stage.Weight:
+                    if (pressurePlate.IsReleased)
+                    {
+                        grate.SetActive(false);
+                        SetStage(Stage.Vent);
+                        Debug.Log("Warehouse pressure plate released.");
+                    }
+                    break;
                 case Stage.Arriving:
                     if (Mathf.Abs(PlayerFloor.y - shelfArrival.position.y) < 0.05f)
-                        stage = Stage.Box;
+                        SetStage(Stage.Box);
                     break;
                 case Stage.Lifting:
                     LiftBox();
@@ -78,26 +95,75 @@ namespace Warehouse
                 case Stage.Balcony:
                     if (exitZone.bounds.Contains(PlayerFloor))
                     {
+                        balconyPad.enabled = false;
                         exitSign.text = "COMPLETE";
                         exitSign.color = new Color(0.4f, 1f, 0.7f);
-                        stage = Stage.Complete;
+                        SetStage(Stage.Complete);
                         Debug.Log("Warehouse route complete.");
                     }
                     break;
             }
         }
 
-        bool AimAt(Collider target)
+        void AimAndActivate(Collider target)
         {
             Vector3 direction = rightController.forward;
             Vector3 origin = rightController.position + direction * 0.07f;
-            bool hit = Physics.Raycast(origin, direction, out RaycastHit result, AimRange,
+            var hintHit = hints.Intersect(new Ray(origin, direction), out Vector3 hintPoint);
+            bool onButton = hintHit == WarehouseHints.Hit.Button;
+            hints.SetHovered(onButton);
+
+            bool complete = stage == Stage.Complete;
+            bool pressed = activate.action.WasPressedThisFrame();
+            if (complete && onButton && pressed)
+            {
+                if (!restarting)
+                {
+                    restarting = true;
+                    SceneManager.LoadSceneAsync(gameObject.scene.path, LoadSceneMode.Single);
+                }
+                return;
+            }
+
+            bool shortcut = !complete && hints.ShortcutPressed;
+            if (shortcut || (onButton && pressed))
+                hints.Toggle();
+
+            aimLine.enabled = target != null || onButton || complete;
+            bool hitScene = Physics.Raycast(origin, direction, out RaycastHit result, AimRange,
                 Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore);
-            bool onTarget = hit && result.collider == target;
+            bool onTarget = hintHit == WarehouseHints.Hit.None && hitScene && result.collider == target;
+            pressurePlate.SetHighlighted(stage == Stage.Weight && onTarget);
+
+            Vector3 end = hitScene ? result.point : origin + direction * AimRange;
+            if (hintHit != WarehouseHints.Hit.None)
+                end = hintPoint;
             aimLine.SetPosition(0, origin);
-            aimLine.SetPosition(1, hit ? result.point : origin + direction * AimRange);
-            aimLine.startColor = aimLine.endColor = onTarget ? TargetColor : AimColor;
-            return onTarget;
+            aimLine.SetPosition(1, end);
+            aimLine.startColor = aimLine.endColor = onTarget || onButton ? TargetColor : AimColor;
+            if (onTarget && pressed && !shortcut)
+                ActivateTarget();
+        }
+
+        void SetStage(Stage next)
+        {
+            stage = next;
+            if (stage == Stage.Complete)
+            {
+                hints.ShowCompletion();
+                return;
+            }
+
+            var (title, instructions) = stage switch
+            {
+                Stage.Weight => ("Уменьши гирю", "Наведи луч правой рукой на гирю и нажми курок."),
+                Stage.Vent => ("Пройди через вентиляцию", "Левым стиком переместись к решётке. Наведи правый луч на проём и нажми курок."),
+                Stage.Arriving => ("Переход на полку", ""),
+                Stage.Box => ("Подними ящик", "С полки наведи правый луч на ящик внизу и нажми курок."),
+                Stage.Lifting => ("Ящик поднимается", "Дождись фиксации ящика в пазу."),
+                _ => ("Доберись до выхода", "Левым стиком телепортируйся на балкон к двери с надписью EXIT."),
+            };
+            hints.Show(title, instructions);
         }
 
         void ActivateTarget()
@@ -105,8 +171,7 @@ namespace Warehouse
             switch (stage)
             {
                 case Stage.Weight:
-                    grate.SetActive(false);
-                    stage = Stage.Vent;
+                    pressurePlate.Shrink();
                     break;
                 case Stage.Vent:
                     startPad.enabled = false;
@@ -117,10 +182,10 @@ namespace Warehouse
                         destinationRotation = shelfArrival.rotation,
                         matchOrientation = MatchOrientation.TargetUpAndForward,
                     });
-                    stage = Stage.Arriving;
+                    SetStage(Stage.Arriving);
                     break;
                 case Stage.Box:
-                    stage = Stage.Lifting;
+                    SetStage(Stage.Lifting);
                     aimLine.enabled = false;
                     break;
             }
@@ -136,7 +201,7 @@ namespace Warehouse
             {
                 box.transform.position = destination;
                 balconyPad.gameObject.SetActive(true);
-                stage = Stage.Balcony;
+                SetStage(Stage.Balcony);
             }
         }
     }

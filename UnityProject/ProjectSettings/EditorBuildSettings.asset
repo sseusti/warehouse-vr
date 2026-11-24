@@ -8,6 +8,9 @@ EditorBuildSettings:
   - enabled: 1
     path: Assets/Day1/InteractionCheck.unity
     guid: ccb68533c490142c19c472229814fb04
+  - enabled: 1
+    path: Assets/Day2/Warehouse.unity
+    guid: 6966e46cb799f463f9ff726ac68dd6fb
   m_configObjects:
     com.unity.xr.management.loader_settings: {fileID: 11400000, guid: 1ebc2c7b230d540638e323f095cbd4d0, type: 2}
     com.unity.xr.openxr.settings4: {fileID: 11400000, guid: d8a459b9516034e8d9bd7d3db3f0a12d, type: 2}

@@ -78,11 +78,12 @@ namespace Warehouse.Editor
                 new Vector2(1.3f, 1.1f), pad, route.teleport);
             route.ventPad = AddPad("Vent Approach", new Vector3(-3.85f, 0.015f, 0.8f),
                 new Vector2(1.35f, 1.05f), pad, route.teleport);
-            CreateBlock("Pressure Plate", new Vector3(-3.85f, 0.055f, -0.38f),
+            var plate = CreateBlock("Pressure Plate", new Vector3(-3.85f, 0.055f, -0.38f),
                 new Vector3(0.8f, 0.11f, 0.75f), steel);
             route.weight = CreateBlock("Weight", new Vector3(-3.85f, 0.34f, -0.38f),
                 new Vector3(0.51f, 0.46f, 0.51f), target).GetComponent<Collider>();
-            Sign("Weight Sign", "WEIGHT\nRIGHT TRIGGER", new Vector3(-3.85f, 0.69f, -0.64f));
+            var weightSign = Sign("Weight Sign", "WEIGHT\nRIGHT TRIGGER", new Vector3(-3.85f, 0.69f, -0.64f));
+            ConfigureWeightPuzzle(route, plate, weightSign);
 
             route.vent = CreateBlock("Vent Recess", new Vector3(-3.85f, 0.44f, 2.72f),
                 new Vector3(0.86f, 0.78f, 0.10f), steel).GetComponent<Collider>();
@@ -134,6 +135,23 @@ namespace Warehouse.Editor
 
             AssetDatabase.SaveAssets();
             EditorSceneManager.OpenScene(ScenePath);
+        }
+
+        internal static void ConfigureWeightPuzzle(WarehouseRoute route, GameObject plate, TextMesh weightSign)
+        {
+            Vector3 center = plate.transform.position;
+            plate.transform.position = center - Vector3.up * 0.03f;
+            plate.transform.localScale = new Vector3(0.8f, 0.05f, 0.75f);
+            var button = CreateBlock("Pressure Button", center + Vector3.up * 0.025f,
+                new Vector3(0.68f, 0.06f, 0.63f), Material("Pressure Button", new Color(0.20f, 0.65f, 0.82f)));
+
+            var weight = route.weight.gameObject.AddComponent<Rigidbody>();
+            weight.mass = 8f;
+            weight.isKinematic = true;
+            weight.useGravity = false;
+            route.pressurePlate = plate.AddComponent<WeightPressurePlate>();
+            route.pressurePlate.Configure(weight, button.transform);
+            weightSign.text = "SHRINK\nRIGHT TRIGGER";
         }
 
         static UnityEngine.Material Material(string name, Color color, string shader = "Standard")

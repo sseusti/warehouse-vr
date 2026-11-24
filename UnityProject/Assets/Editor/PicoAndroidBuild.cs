@@ -62,7 +62,13 @@ namespace Warehouse.Editor
                 return;
 
             DayTwoScene.EnsureScene();
-            Build(DayTwoScene.ScenePath, "Warehouse-Day2.apk", ApplicationId + ".day2");
+            Build(DayTwoScene.ScenePath, "Warehouse-Day2.apk", ApplicationId + ".day2", "Warehouse VR Day 2");
+        }
+
+        public static void BuildWeightCheck()
+        {
+            DayTwoScene.EnsureScene();
+            Build(DayTwoScene.ScenePath, "Warehouse-Weight.apk", ApplicationId + ".weight", "Warehouse VR Weight");
         }
 
         static void ConfigurePlayer()
@@ -133,7 +139,8 @@ namespace Warehouse.Editor
             EditorUtility.SetDirty(feature);
         }
 
-        static void Build(string scene, string filename, string applicationId = ApplicationId)
+        static void Build(string scene, string filename, string applicationId = ApplicationId,
+            string productName = "Warehouse VR")
         {
             if (EditorUserBuildSettings.activeBuildTarget != BuildTarget.Android)
                 throw new BuildFailedException("Switch to Android before building, or pass -buildTarget Android.");
@@ -146,8 +153,7 @@ namespace Warehouse.Editor
             BuildReport report;
             try
             {
-                if (applicationId != ApplicationId)
-                    PlayerSettings.productName = "Warehouse VR Day 2";
+                PlayerSettings.productName = productName;
                 PlayerSettings.SetApplicationIdentifier(NamedBuildTarget.Android, applicationId);
                 report = BuildPipeline.BuildPlayer(new BuildPlayerOptions
                 {

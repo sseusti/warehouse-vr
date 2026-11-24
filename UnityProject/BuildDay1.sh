@@ -12,7 +12,8 @@ case "${1:-both}" in
     tracking) build_targets=(TrackingCheck) ;;
     interaction) build_targets=(InteractionCheck) ;;
     both) build_targets=(TrackingCheck InteractionCheck) ;;
-    *) printf 'Usage: %s [tracking|interaction|both]\n' "$0" >&2; exit 1 ;;
+    warehouse) build_targets=(Warehouse) ;;
+    *) printf 'Usage: %s [tracking|interaction|both|warehouse]\n' "$0" >&2; exit 1 ;;
 esac
 
 # Unity's Android tools require an ASCII-only project path.
@@ -35,6 +36,7 @@ for target in "${build_targets[@]}"; do
     case "$target" in
         TrackingCheck) apk=Warehouse-Tracking.apk ;;
         InteractionCheck) apk=Warehouse-Day1.apk ;;
+        Warehouse) apk=Warehouse-Day2.apk ;;
     esac
     mv -f "$staging_dir/Builds/$apk" "$project_dir/Builds/$apk"
     printf 'APK built at %s\n' "$project_dir/Builds/$apk"

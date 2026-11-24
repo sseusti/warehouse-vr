@@ -54,6 +54,17 @@ namespace Warehouse.Editor
             Build(DayOneScenes.InteractionScene, "Warehouse-Day1.apk");
         }
 
+        [MenuItem("Warehouse/Build Day 2 Warehouse APK")]
+        public static void BuildWarehouse()
+        {
+            if (!EditorApplication.isPlayingOrWillChangePlaymode && !Application.isBatchMode &&
+                !UnityEditor.SceneManagement.EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo())
+                return;
+
+            DayTwoScene.EnsureScene();
+            Build(DayTwoScene.ScenePath, "Warehouse-Day2.apk", ApplicationId + ".day2");
+        }
+
         static void ConfigurePlayer()
         {
             PlayerSettings.productName = "Warehouse VR";
@@ -122,7 +133,7 @@ namespace Warehouse.Editor
             EditorUtility.SetDirty(feature);
         }
 
-        static void Build(string scene, string filename)
+        static void Build(string scene, string filename, string applicationId = ApplicationId)
         {
             if (EditorUserBuildSettings.activeBuildTarget != BuildTarget.Android)
                 throw new BuildFailedException("Switch to Android before building, or pass -buildTarget Android.");
@@ -130,13 +141,27 @@ namespace Warehouse.Editor
             Prepare();
             ValidateOpenXR();
             Directory.CreateDirectory("Builds");
-            var report = BuildPipeline.BuildPlayer(new BuildPlayerOptions
+            var oldProductName = PlayerSettings.productName;
+            var oldApplicationId = PlayerSettings.GetApplicationIdentifier(NamedBuildTarget.Android);
+            BuildReport report;
+            try
             {
-                scenes = new[] { scene },
-                locationPathName = Path.GetFullPath(Path.Combine("Builds", filename)),
-                target = BuildTarget.Android,
-                options = BuildOptions.Development,
-            });
+                if (applicationId != ApplicationId)
+                    PlayerSettings.productName = "Warehouse VR Day 2";
+                PlayerSettings.SetApplicationIdentifier(NamedBuildTarget.Android, applicationId);
+                report = BuildPipeline.BuildPlayer(new BuildPlayerOptions
+                {
+                    scenes = new[] { scene },
+                    locationPathName = Path.GetFullPath(Path.Combine("Builds", filename)),
+                    target = BuildTarget.Android,
+                    options = BuildOptions.Development,
+                });
+            }
+            finally
+            {
+                PlayerSettings.productName = oldProductName;
+                PlayerSettings.SetApplicationIdentifier(NamedBuildTarget.Android, oldApplicationId);
+            }
 
             if (report.summary.result != BuildResult.Succeeded)
                 throw new BuildFailedException("APK build ended with " + report.summary.result);

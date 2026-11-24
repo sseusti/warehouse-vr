@@ -200,22 +200,29 @@ namespace Warehouse.Editor
 
         static void AddPad(string name, Vector3 position, Material material, TeleportationProvider provider)
         {
-            var pad = CreateBlock(name, position, new Vector3(1.05f, 0.03f, 1.05f), material);
+            AddPad(name, position, new Vector2(1.05f, 1.05f), material, provider);
+        }
+
+        internal static TeleportationArea AddPad(string name, Vector3 position, Vector2 size,
+            Material material, TeleportationProvider provider)
+        {
+            var pad = CreateBlock(name, position, new Vector3(size.x, 0.03f, size.y), material);
             var area = pad.AddComponent<TeleportationArea>();
             area.interactionLayers = TeleportLayer;
             area.teleportationProvider = provider;
             area.teleportTrigger = BaseTeleportationInteractable.TeleportTrigger.OnSelectExited;
             area.filterSelectionByHitNormal = true;
+            return area;
         }
 
-        static InputActionReference Action(InputActionAsset actions, string path)
+        internal static InputActionReference Action(InputActionAsset actions, string path)
         {
             var action = actions.FindAction(path, throwIfNotFound: true);
             return AssetDatabase.LoadAllAssetsAtPath(ActionsPath).OfType<InputActionReference>()
                 .First(reference => reference.action?.id == action.id);
         }
 
-        static GameObject CreateBlock(string name, Vector3 position, Vector3 size, Material material,
+        internal static GameObject CreateBlock(string name, Vector3 position, Vector3 size, Material material,
             Transform parent = null)
         {
             var block = GameObject.CreatePrimitive(PrimitiveType.Cube);
@@ -229,7 +236,12 @@ namespace Warehouse.Editor
 
         static Material MakeMaterial(string name, Color color, string shaderName = "Standard")
         {
-            string path = AssetFolder + "/" + name + ".mat";
+            return MakeMaterial(AssetFolder, name, color, shaderName);
+        }
+
+        internal static Material MakeMaterial(string folder, string name, Color color, string shaderName)
+        {
+            string path = folder + "/" + name + ".mat";
             var material = AssetDatabase.LoadAssetAtPath<Material>(path);
             if (material != null)
                 return material;

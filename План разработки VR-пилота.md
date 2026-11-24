@@ -127,6 +127,25 @@
 - [x] Обновление `Warehouse-Weight.apk` установлено на Pico 4. SHA-256 установленного файла совпал с локальным.
 - [x] На Pico 4 проверены подпись режима рядом с контроллером, сброс после открытия решётки и повторный старт после выхода.
 
+## Работа вдвоём: Windows и macOS
+
+**Статус.** Репозиторий подготовлен в ветке `artem/windows-setup`. Сборка на Windows проверена, установка на Pico 4 с Windows — за пользователем.
+
+На Windows сборку выполняет `UnityProject/Build.ps1` с теми же целями, что у `BuildDay1.sh`: `tracking`, `interaction`, `both` (по умолчанию), `warehouse`, `weight`. Команда: `powershell -ExecutionPolicy Bypass -File UnityProject\Build.ps1 weight`. Unity берётся из `C:\Program Files\Unity\Hub\Editor\6000.0.85f2`, другой путь задаёт переменная `UNITY_EDITOR_PATH`. Скрипт копирует проект во временную папку с ASCII-путём, журналы пишет в `UnityProject/Logs`, APK — в `UnityProject/Builds`.
+
+`.gitattributes` хранит текст в репозитории с LF, YAML-файлы Unity и `.cs` держит с LF и на Windows, `.ps1` — с CRLF. Сцены, префабы и `.asset` сливаются через UnityYAMLMerge. Драйвер слияния каждый регистрирует у себя один раз:
+
+- Windows: `git config merge.unityyamlmerge.driver "'C:/Program Files/Unity/Hub/Editor/6000.0.85f2/Editor/Data/Tools/UnityYAMLMerge.exe' merge -p %O %B %A %A"`
+- macOS: `git config merge.unityyamlmerge.driver "'/Applications/Unity/Hub/Editor/6000.0.85f2/Unity.app/Contents/Tools/UnityYAMLMerge' merge -p %O %B %A %A"`
+- Обоим: `git config merge.unityyamlmerge.name "Unity SmartMerge"`
+
+Если сцену всё же поменяли двое, сцену не чинят слиянием, а пересоздают командой меню `Warehouse/...` из слитого Editor-скрипта.
+
+- [x] `.gitignore` дополнен `.vs/`, `.idea/`, `*.apk`.
+- [x] `Build.ps1 weight` собрал `Warehouse-Weight.apk` на Windows (Unity 6000.0.85f2, «Build Finished, Result: Success»), временная копия проекта удалена.
+- [ ] APK из Windows-сборки установлен и запущен на Pico 4.
+- [ ] Друг на macOS проверил `bash UnityProject/BuildDay1.sh weight` после слияния ветки.
+
 ## Контрольные точки
 
 - **Конец третьего дня.** В шлеме пройден маршрут от вентиляции через полку до балкона с временными триггерами. Если с полки неудобно целиться или направление движения непонятно, поправить геометрию до подключения физики.

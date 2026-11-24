@@ -12,8 +12,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 122c1b6ac3926564ca8cbf101d2bdb7c, type: 3}
   m_Name: PressurePlateSettings
   m_EditorClassIdentifier: 
-  shrinkScale: 0.5
-  releaseMass: 2
-  shrinkDuration: 0.4
-  buttonTravel: 0.08
-  buttonDuration: 0.18
+  minMass: 1.5
+  maxMass: 2.5
+  springMass: 4
+  buttonTravel: 0.1
+  buttonSpeed: 0.25

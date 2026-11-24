@@ -3,33 +3,51 @@ using UnityEngine;
 
 namespace Warehouse
 {
+    /// <summary>
+    /// Spring scale under the weight. The button rises the lighter the load is,
+    /// and the lock opens once the settled mass falls inside the window.
+    /// </summary>
     public sealed class WeightPressurePlate : MonoBehaviour
     {
         [SerializeField] Rigidbody weight;
         [SerializeField] Transform button;
         [SerializeField] private PressurePlateSettings settings;
         [SerializeField] private TextMesh readout;
+        [SerializeField] private ScalableBody scalable;
 
         static readonly int ColorProperty = Shader.PropertyToID("_Color");
         static readonly Color HeavyColor = new(1f, 0.45f, 0.38f);
-        static readonly Color LightColor = new(0.45f, 1f, 0.65f);
+        static readonly Color GoodColor = new(0.45f, 1f, 0.65f);
+        static readonly Color LightColor = new(0.55f, 0.75f, 1f);
 
-        Vector3 fullScale;
-        Vector3 weightStart;
-        float fullMass;
-        float weightHalfHeight;
         Vector3 buttonStart;
         Vector3 buttonScale;
-        float scale = 1f;
+        Vector3 restBottom;
         float rise;
-        bool shrinkRequested;
+        bool unlocked;
         Renderer weightRenderer;
         MaterialPropertyBlock weightProperties;
         bool highlighted;
+        float shownScale = -1f;
         float shownMass = -1f;
 
-        public bool IsReleased => weight.mass < settings.ReleaseMass && rise == 1f;
-        public float ShrinkScale => settings.ShrinkScale;
+        public enum Load { Heavy, Good, Light }
+
+        /// <summary>True once the mass has settled inside the window; stays true afterwards.</summary>
+        public bool IsUnlocked => unlocked;
+        public ScalableBody Scalable => scalable;
+        public PressurePlateSettings Settings => settings;
+
+        public Load Current
+        {
+            get
+            {
+                float mass = weight.mass;
+                if (mass > settings.MaxMass + 0.0005f)
+                    return Load.Heavy;
+                return mass < settings.MinMass - 0.0005f ? Load.Light : Load.Good;
+            }
+        }
 
         public void Configure(Rigidbody body, Transform plunger)
         {
@@ -37,28 +55,27 @@ namespace Warehouse
             button = plunger;
         }
 
-        public void ConfigureReadout(PressurePlateSettings values, TextMesh label)
+        public void ConfigureReadout(PressurePlateSettings values, TextMesh label, ScalableBody body)
         {
             settings = values;
             readout = label;
+            scalable = body;
         }
 
         void Awake()
         {
-            fullScale = weight.transform.localScale;
-            fullMass = weight.mass;
-            weightStart = weight.position;
-            weightHalfHeight = weight.GetComponent<BoxCollider>().bounds.extents.y;
             buttonStart = button.position;
             buttonScale = button.localScale;
             weightRenderer = weight.GetComponent<Renderer>();
             weightProperties = new MaterialPropertyBlock();
-            UpdateReadout();
         }
 
-        public void Shrink()
+        void Start()
         {
-            shrinkRequested = true;
+            restBottom = scalable.Bottom;
+            rise = settings.RiseFor(weight.mass);
+            ApplyRise();
+            UpdateReadout();
         }
 
         public void SetHighlighted(bool value)
@@ -75,22 +92,23 @@ namespace Warehouse
 
         void Update()
         {
-            float target = settings.ShrinkScale;
-            if (!shrinkRequested || IsReleased && scale == target)
-                return;
-
-            scale = Mathf.MoveTowards(scale, target, (1f - target) * Time.deltaTime / settings.ShrinkDuration);
-            weight.transform.localScale = fullScale * scale;
-            weight.mass = fullMass * scale * scale * scale;
+            float targetRise = settings.RiseFor(weight.mass);
+            rise = Mathf.MoveTowards(rise, targetRise, settings.ButtonSpeed * Time.deltaTime);
+            ApplyRise();
             UpdateReadout();
 
-            if (weight.mass < settings.ReleaseMass)
-                rise = Mathf.MoveTowards(rise, 1f, Time.deltaTime / settings.ButtonDuration);
+            if (!unlocked && scalable.IsSettled && rise == targetRise && Current == Load.Good)
+            {
+                unlocked = true;
+                Debug.Log($"Warehouse pressure plate unlocked at {weight.mass:0.###} kg.");
+            }
+        }
 
-            float lifted = settings.ButtonTravel * rise;
-            button.localScale = buttonScale + Vector3.up * lifted;
-            button.position = buttonStart + Vector3.up * (lifted * 0.5f);
-            weight.position = weightStart + Vector3.up * (lifted - weightHalfHeight * (1f - scale));
+        void ApplyRise()
+        {
+            button.localScale = buttonScale + Vector3.up * rise;
+            button.position = buttonStart + Vector3.up * (rise * 0.5f);
+            scalable.Bottom = restBottom + Vector3.up * rise;
         }
 
         void UpdateReadout()
@@ -98,15 +116,29 @@ namespace Warehouse
             if (readout == null)
                 return;
 
-            // Text changes only while the shown value changes, so the string is rebuilt rarely.
+            // The text is rebuilt only when the shown numbers change.
+            float shownK = Mathf.Round(scalable.Scale * 100f);
             float mass = Mathf.Round(weight.mass * 10f) / 10f;
-            if (mass == shownMass)
+            if (shownK == shownScale && mass == shownMass)
                 return;
 
+            shownScale = shownK;
             shownMass = mass;
-            bool light = weight.mass < settings.ReleaseMass;
-            readout.text = $"Гиря {Kilograms(mass)} кг\nнужно < {Kilograms(settings.ReleaseMass)} кг";
-            readout.color = light ? LightColor : HeavyColor;
+            Load load = Current;
+            string state = load switch
+            {
+                Load.Heavy => "тяжело",
+                Load.Light => "слишком легко",
+                _ => "в норме",
+            };
+            readout.text = $"Размер {shownK:0} % → {Kilograms(mass)} кг\n" +
+                $"нужно {Kilograms(settings.MinMass)}–{Kilograms(settings.MaxMass)} кг · {state}";
+            readout.color = load switch
+            {
+                Load.Heavy => HeavyColor,
+                Load.Light => LightColor,
+                _ => GoodColor,
+            };
         }
 
         static string Kilograms(float value) =>

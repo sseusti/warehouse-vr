@@ -21,6 +21,7 @@ namespace Warehouse.Editor
         const string GravityPresetsPath = Folder + "/GravityPresets.asset";
         const string FeedbackSettingsPath = Folder + "/RemoteFeedbackSettings.asset";
         const string PlateSettingsPath = Folder + "/PressurePlateSettings.asset";
+        const string ScaleStepSettingsPath = Folder + "/ScaleStepSettings.asset";
         const float BoxYaw = 103f;
         const float BoxMass = 20f;
         const float PlatformHeight = 1.65f;
@@ -185,9 +186,24 @@ namespace Warehouse.Editor
             weight.useGravity = false;
             route.pressurePlate = plate.AddComponent<WeightPressurePlate>();
             route.pressurePlate.Configure(weight, button.transform);
+
+            var scalable = route.weight.gameObject.AddComponent<ScalableBody>();
+            scalable.Configure(LoadOrCreate<ScaleStepSettings>(ScaleStepSettingsPath));
+            scalable.IgnoreForRoomCheck(plate.GetComponent<Collider>(), button.GetComponent<Collider>());
+
+            var settings = LoadOrCreate<PressurePlateSettings>(PlateSettingsPath);
             var readout = Sign("Weight Readout", "", weightSign.transform.position + Vector3.up * 0.39f);
-            route.pressurePlate.ConfigureReadout(LoadOrCreate<PressurePlateSettings>(PlateSettingsPath), readout);
-            weightSign.text = "SHRINK\nRIGHT TRIGGER";
+            route.pressurePlate.ConfigureReadout(settings, readout, scalable);
+            weightSign.text = "SIZE -10% TRIGGER\n+10% STICK UP";
+
+            // Green mark beside the button: its top edge stops inside the mark when the mass is in the window.
+            float buttonTop = button.transform.position.y + button.transform.localScale.y * 0.5f;
+            float low = buttonTop + settings.RiseFor(settings.MaxMass);
+            float high = buttonTop + settings.RiseFor(settings.MinMass);
+            var mark = CreateBlock("Scale Window Mark",
+                new Vector3(center.x, (low + high) * 0.5f, center.z - 0.335f),
+                new Vector3(0.72f, high - low, 0.012f), Material("Scale Window", new Color(0.30f, 0.85f, 0.45f)));
+            UnityEngine.Object.DestroyImmediate(mark.GetComponent<Collider>());
         }
 
         static void ConfigureBoxGravity(WarehouseRoute route, BoxCollider dockZone)

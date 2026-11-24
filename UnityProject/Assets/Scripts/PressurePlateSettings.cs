@@ -5,21 +5,24 @@ namespace Warehouse
     [CreateAssetMenu(menuName = "Warehouse/Pressure Plate Settings", fileName = "PressurePlateSettings")]
     public sealed class PressurePlateSettings : ScriptableObject
     {
-        [Tooltip("Scale factor k the remote applies to the weight. Mass follows m = m0 * k^3.")]
-        [SerializeField, Range(0.1f, 1f)] private float shrinkScale = 0.5f;
-        [Tooltip("The button rises when the mass on it drops below this value, kg.")]
-        [SerializeField, Min(0f)] private float releaseMass = 2f;
-        [Tooltip("Duration of the weight shrinking, seconds.")]
-        [SerializeField, Min(0.01f)] private float shrinkDuration = 0.4f;
-        [Tooltip("How far the button rises, meters.")]
-        [SerializeField, Min(0f)] private float buttonTravel = 0.08f;
-        [Tooltip("Duration of the button rising, seconds.")]
-        [SerializeField, Min(0.01f)] private float buttonDuration = 0.18f;
+        [Tooltip("The lock opens when the settled mass on the plate is at least this, kg.")]
+        [SerializeField, Min(0f)] private float minMass = 1.5f;
+        [Tooltip("The lock opens when the settled mass on the plate is at most this, kg.")]
+        [SerializeField, Min(0f)] private float maxMass = 2.5f;
+        [Tooltip("Mass that presses the spring button fully down, kg. Lighter loads let it rise proportionally.")]
+        [SerializeField, Min(0.01f)] private float springMass = 4f;
+        [Tooltip("Rise of the button with nothing on it, meters.")]
+        [SerializeField, Min(0f)] private float buttonTravel = 0.1f;
+        [Tooltip("Button speed, meters per second.")]
+        [SerializeField, Min(0.01f)] private float buttonSpeed = 0.25f;
 
-        public float ShrinkScale => shrinkScale;
-        public float ReleaseMass => releaseMass;
-        public float ShrinkDuration => shrinkDuration;
+        public float MinMass => minMass;
+        public float MaxMass => maxMass;
+        public float SpringMass => springMass;
         public float ButtonTravel => buttonTravel;
-        public float ButtonDuration => buttonDuration;
+        public float ButtonSpeed => buttonSpeed;
+
+        /// <summary>Spring rise of the button under the given mass, meters.</summary>
+        public float RiseFor(float mass) => buttonTravel * Mathf.Clamp01((springMass - mass) / springMass);
     }
 }

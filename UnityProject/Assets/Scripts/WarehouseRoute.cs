@@ -38,6 +38,7 @@ namespace Warehouse
         [SerializeField] private RemoteFeedback feedback;
 
         const float AimRange = 7f;
+        const float PlayerClearance = 0.3f;
         static readonly Color AimColor = new(0.73f, 0.81f, 0.9f, 0.55f);
         static readonly Color TargetColor = new(1f, 0.78f, 0.27f);
         static readonly Color ForbiddenColor = new(0.95f, 0.25f, 0.2f);
@@ -48,6 +49,7 @@ namespace Warehouse
         RemoteMode mode;
         WarehouseOverlay overlay;
         InputAction switchMode;
+        InputAction grow;
         bool restarting;
         float aimWidth;
         bool wasAiming;
@@ -77,6 +79,9 @@ namespace Warehouse
             overlay = new WarehouseOverlay(player.Camera, transform);
             switchMode = new InputAction("Switch remote mode", InputActionType.Button,
                 "<XRController>{RightHand}/{PrimaryButton}");
+            // Right stick up enlarges the aimed object; left/right stays snap turn.
+            grow = new InputAction("Grow aimed object", InputActionType.Button,
+                "<XRController>{RightHand}/{Primary2DAxis}/up");
             SetMode(RemoteMode.Size);
         }
 
@@ -85,6 +90,7 @@ namespace Warehouse
             scaler.Changed += RefreshHint;
             overlay.EnableShortcut();
             switchMode.Enable();
+            grow.Enable();
         }
 
         void OnDisable()
@@ -92,12 +98,14 @@ namespace Warehouse
             scaler.Changed -= RefreshHint;
             overlay.DisableShortcut();
             switchMode.Disable();
+            grow.Disable();
         }
 
         void OnDestroy()
         {
             overlay.Dispose();
             switchMode.Dispose();
+            grow.Dispose();
         }
 
         void SetMode(RemoteMode selected)
@@ -130,7 +138,7 @@ namespace Warehouse
             switch (stage)
             {
                 case Stage.Weight:
-                    if (pressurePlate.IsReleased)
+                    if (pressurePlate.IsUnlocked)
                     {
                         grate.SetActive(false);
                         feedback.Succeeded(grate.transform.position);
@@ -229,6 +237,14 @@ namespace Warehouse
                 feedback.Hover();
             wasAiming = aiming;
 
+            if (stage == Stage.Weight && onCollider && grow.WasPressedThisFrame())
+            {
+                if (onTarget)
+                    ResizeWeight(+1, result.point);
+                else
+                    feedback.Denied(result.point);
+            }
+
             if (!pressed || shortcut)
                 return;
             if (onSelf)
@@ -245,6 +261,15 @@ namespace Warehouse
                 // Right object, but the remote cannot act on it now: wrong mode or too big for the vent.
                 feedback.Denied(result.point);
             }
+        }
+
+        void ResizeWeight(int direction, Vector3 point)
+        {
+            ScalableBody body = pressurePlate.Scalable;
+            if (body.TryStep(direction, PlayerFloor, PlayerClearance))
+                feedback.Applied(point, feedback.PitchForScale(body.TargetScale));
+            else
+                feedback.Denied(point);
         }
 
         void SetStage(Stage next)
@@ -264,8 +289,9 @@ namespace Warehouse
             var (title, instructions) = stage switch
             {
                 Stage.Weight when mode != RemoteMode.Size =>
-                    ("Уменьши гирю", "Нажми A для режима «Размер». Наведи луч на гирю и нажми курок."),
-                Stage.Weight => ("Уменьши гирю", "Наведи правый луч на гирю и нажми курок."),
+                    ("Подбери массу гири", "Нажми A для режима «Размер». Затем наведи луч на гирю."),
+                Stage.Weight => ("Подбери массу гири",
+                    "Луч на гирю: курок — меньше на 10 %, правый стик вверх — больше. Весам нужно 1,5–2,5 кг."),
                 Stage.Vent when !scaler.FitsVent && mode != RemoteMode.Size =>
                     ("Стань меньше", "Нажми A для режима «Размер». Наведи луч на кольцо у себя под ногами и нажми курок."),
                 Stage.Vent when !scaler.FitsVent =>
@@ -290,8 +316,7 @@ namespace Warehouse
             switch (stage)
             {
                 case Stage.Weight:
-                    pressurePlate.Shrink();
-                    feedback.Applied(point, feedback.PitchForScale(pressurePlate.ShrinkScale));
+                    ResizeWeight(-1, point);
                     break;
                 case Stage.Vent:
                     startPad.enabled = false;

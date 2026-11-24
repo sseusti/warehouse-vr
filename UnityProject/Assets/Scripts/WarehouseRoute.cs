@@ -27,21 +27,21 @@ namespace Warehouse
         [Header("Shelf and exit")]
         public Transform shelfArrival;
         public Collider box;
-        public BoxCollider dockZone;
         public TeleportationArea balconyPad;
         public BoxCollider exitZone;
         public TextMesh exitSign;
 
         [Header("Remote effects")]
         [SerializeField] private PlayerScaler scaler;
+        [SerializeField] private GravityBody boxGravity;
+        [SerializeField] private GravitySocket boxSocket;
 
         const float AimRange = 7f;
-        const float LiftSpeed = 1.4f;
         static readonly Color AimColor = new(0.73f, 0.81f, 0.9f, 0.55f);
         static readonly Color TargetColor = new(1f, 0.78f, 0.27f);
         static readonly Color ForbiddenColor = new(0.95f, 0.25f, 0.2f);
 
-        enum Stage { Weight, Vent, Arriving, Box, Lifting, Balcony, Complete }
+        enum Stage { Weight, Vent, Arriving, Box, Balcony, Complete }
         enum RemoteMode { Size, Gravity }
         Stage stage = Stage.Weight;
         RemoteMode mode;
@@ -53,9 +53,15 @@ namespace Warehouse
         Vector3 PlayerFloor => scaler.Floor;
 
         bool SelfTargetAvailable => mode == RemoteMode.Size && !scaler.IsChanging &&
-            stage is Stage.Vent or Stage.Box or Stage.Lifting or Stage.Balcony;
+            stage is Stage.Vent or Stage.Box or Stage.Balcony;
 
         public void ConfigureScaler(PlayerScaler value) => scaler = value;
+
+        public void ConfigureBox(GravityBody gravity, GravitySocket socket)
+        {
+            boxGravity = gravity;
+            boxSocket = socket;
+        }
 
         void Awake()
         {
@@ -128,8 +134,13 @@ namespace Warehouse
                     if (Mathf.Abs(PlayerFloor.y - shelfArrival.position.y) < 0.05f)
                         SetStage(Stage.Box);
                     break;
-                case Stage.Lifting:
-                    LiftBox();
+                case Stage.Box:
+                    if (boxSocket.IsFilled)
+                    {
+                        balconyPad.gameObject.SetActive(true);
+                        SetStage(Stage.Balcony);
+                        Debug.Log("Warehouse box docked.");
+                    }
                     break;
                 case Stage.Balcony:
                     if (scaler.IsNormalSize && exitZone.bounds.Contains(PlayerFloor))
@@ -189,6 +200,7 @@ namespace Warehouse
             bool forbidden = onCollider && stage == Stage.Vent && !scaler.FitsVent;
             bool onTarget = onCollider && modeMatches && !forbidden && !scaler.IsChanging;
             pressurePlate.SetHighlighted(stage == Stage.Weight && onTarget);
+            boxGravity.SetHighlighted(stage == Stage.Box && onTarget);
 
             Vector3 end = hitScene ? result.point : origin + direction * AimRange;
             if (onSelf)
@@ -238,8 +250,8 @@ namespace Warehouse
                     ("Верни свой размер", "Наведи луч на кольцо у себя под ногами и нажимай курок, пока не станешь прежним."),
                 Stage.Box when mode != RemoteMode.Gravity =>
                     ("Подними ящик", "Нажми A для режима «Гравитация». Наведи луч на ящик и нажми курок."),
-                Stage.Box => ("Подними ящик", "Наведи правый луч на ящик внизу и нажми курок."),
-                Stage.Lifting => ("Ящик поднимается", "Дождись фиксации ящика в пазу."),
+                Stage.Box => ("Подними ящик в паз",
+                    $"Курок по ящику меняет его гравитацию. Сейчас: {boxGravity.Current.label}. Найди ту, что тянет вверх."),
                 _ => ("Доберись до выхода", "Левым стиком телепортируйся на балкон к двери с надписью EXIT."),
             };
             overlay.Show(title, instructions);
@@ -264,23 +276,9 @@ namespace Warehouse
                     SetStage(Stage.Arriving);
                     break;
                 case Stage.Box:
-                    SetStage(Stage.Lifting);
-                    aimLine.enabled = false;
+                    boxGravity.NextPreset();
+                    RefreshHint();
                     break;
-            }
-        }
-
-        void LiftBox()
-        {
-            Vector3 destination = dockZone.bounds.center;
-            Vector3 position = Vector3.MoveTowards(box.transform.position, destination,
-                LiftSpeed * Time.deltaTime);
-            box.transform.position = position;
-            if (dockZone.bounds.Contains(position))
-            {
-                box.transform.position = destination;
-                balconyPad.gameObject.SetActive(true);
-                SetStage(Stage.Balcony);
             }
         }
     }

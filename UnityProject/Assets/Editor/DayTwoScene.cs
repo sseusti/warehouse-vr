@@ -17,6 +17,9 @@ namespace Warehouse.Editor
         const string Folder = "Assets/Day2";
         public const string ScenePath = Folder + "/Warehouse.unity";
         const string ScaleSettingsPath = Folder + "/PlayerScaleSettings.asset";
+        const string GravityPresetsPath = Folder + "/GravityPresets.asset";
+        const float BoxYaw = 103f;
+        const float BoxMass = 20f;
         const float PlatformHeight = 1.65f;
 
         [MenuItem("Warehouse/Open Day 2 Warehouse")]
@@ -127,10 +130,10 @@ namespace Warehouse.Editor
                 Quaternion.Euler(0f, 103f, 0f));
             route.box = CreateBlock("Lift Box", new Vector3(1.25f, 0.36f, 0.45f),
                 Vector3.one * 0.72f, target).GetComponent<Collider>();
-            Sign("Box Sign", "BOX\nRIGHT TRIGGER", new Vector3(1.25f, 0.92f, 0.45f), 103f);
 
             var dock = new Vector3(1.25f, 1.66f, 0.45f);
-            route.dockZone = Zone("Dock Trigger", dock, Vector3.one * 0.08f);
+            var dockZone = Zone("Dock Trigger", dock, Vector3.one * 0.08f);
+            ConfigureBoxGravity(route, dockZone);
             CreateBlock("Dock Top", dock + Vector3.up * 0.44f, new Vector3(1.04f, 0.14f, 1.04f), steel);
             CreateBlock("Dock Left", dock + Vector3.back * 0.44f, new Vector3(1.04f, 0.65f, 0.13f), steel);
             CreateBlock("Dock Right", dock + Vector3.forward * 0.44f, new Vector3(1.04f, 0.65f, 0.13f), steel);
@@ -170,6 +173,34 @@ namespace Warehouse.Editor
             route.pressurePlate = plate.AddComponent<WeightPressurePlate>();
             route.pressurePlate.Configure(weight, button.transform);
             weightSign.text = "SHRINK\nRIGHT TRIGGER";
+        }
+
+        static void ConfigureBoxGravity(WarehouseRoute route, BoxCollider dockZone)
+        {
+            var body = route.box.gameObject.AddComponent<Rigidbody>();
+            body.mass = BoxMass;
+            body.useGravity = false;
+            body.constraints = RigidbodyConstraints.FreezeRotation;
+            body.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
+            body.interpolation = RigidbodyInterpolation.Interpolate;
+            body.linearDamping = 0.05f;
+
+            var gravity = route.box.gameObject.AddComponent<GravityBody>();
+            gravity.Configure(LoadOrCreate<GravityPresets>(GravityPresetsPath), BoxYaw);
+            var socket = dockZone.gameObject.AddComponent<GravitySocket>();
+            socket.Configure(gravity);
+            route.ConfigureBox(gravity, socket);
+        }
+
+        static T LoadOrCreate<T>(string path) where T : ScriptableObject
+        {
+            var asset = AssetDatabase.LoadAssetAtPath<T>(path);
+            if (asset != null)
+                return asset;
+
+            asset = ScriptableObject.CreateInstance<T>();
+            AssetDatabase.CreateAsset(asset, path);
+            return asset;
         }
 
         static PlayerScaleSettings ScaleSettings()

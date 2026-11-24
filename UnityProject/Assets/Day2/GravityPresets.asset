@@ -1,0 +1,33 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b2d94209292e7b047b9232b1ef649164, type: 3}
+  m_Name: GravityPresets
+  m_EditorClassIdentifier: 
+  presets:
+  - label: "\u0417\u0435\u043C\u043B\u044F"
+    acceleration: 9.81
+    upward: 0
+  - label: "\u041B\u0443\u043D\u0430"
+    acceleration: 1.62
+    upward: 0
+  - label: "\u041C\u0430\u0440\u0441"
+    acceleration: 3.71
+    upward: 0
+  - label: "\u042E\u043F\u0438\u0442\u0435\u0440"
+    acceleration: 24.79
+    upward: 0
+  - label: "\u041D\u0435\u0432\u0435\u0441\u043E\u043C\u043E\u0441\u0442\u044C"
+    acceleration: 0
+    upward: 0
+  - label: "\u0412\u0432\u0435\u0440\u0445"
+    acceleration: 9.81
+    upward: 1

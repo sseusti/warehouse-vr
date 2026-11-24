@@ -50,6 +50,7 @@ namespace Warehouse.Editor
             var route = new GameObject("Warehouse Route").AddComponent<WarehouseRoute>();
             route.player = rig.GetComponent<XROrigin>();
             route.teleport = rig.GetComponent<TeleportationProvider>();
+            route.leftController = rig.transform.Find("Camera Offset/Left Controller");
             route.rightController = rig.transform.Find("Camera Offset/Right Controller");
             var input = rig.GetComponent<InputActionManager>().actionAssets[0];
             route.activate = Action(input, "XRI Right Interaction/Activate");

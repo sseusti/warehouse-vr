@@ -10,6 +10,7 @@ namespace Warehouse
     {
         [Header("Player")]
         public XROrigin player;
+        public Transform leftController;
         public Transform rightController;
         public InputActionReference activate;
         public TeleportationProvider teleport;
@@ -37,8 +38,11 @@ namespace Warehouse
         static readonly Color TargetColor = new(1f, 0.78f, 0.27f);
 
         enum Stage { Weight, Vent, Arriving, Box, Lifting, Balcony, Complete }
-        Stage stage;
-        WarehouseHints hints;
+        enum RemoteMode { Size, Gravity }
+        Stage stage = Stage.Weight;
+        RemoteMode mode;
+        WarehouseOverlay overlay;
+        InputAction switchMode;
         bool restarting;
 
         Vector3 PlayerFloor
@@ -55,16 +59,46 @@ namespace Warehouse
         {
             balconyPad.gameObject.SetActive(false);
             aimLine.enabled = false;
-            hints = new WarehouseHints(player.Camera, transform);
-            SetStage(Stage.Weight);
+            if (leftController == null)
+                leftController = player.CameraFloorOffsetObject.transform.Find("Left Controller");
+            overlay = new WarehouseOverlay(player.Camera, transform);
+            switchMode = new InputAction("Switch remote mode", InputActionType.Button,
+                "<XRController>{RightHand}/{PrimaryButton}");
+            SetMode(RemoteMode.Size);
         }
 
-        void OnEnable() => hints.EnableShortcut();
-        void OnDisable() => hints.DisableShortcut();
-        void OnDestroy() => hints.Dispose();
+        void OnEnable()
+        {
+            overlay.EnableShortcut();
+            switchMode.Enable();
+        }
+
+        void OnDisable()
+        {
+            overlay.DisableShortcut();
+            switchMode.Disable();
+        }
+
+        void OnDestroy()
+        {
+            overlay.Dispose();
+            switchMode.Dispose();
+        }
+
+        void SetMode(RemoteMode selected)
+        {
+            mode = selected;
+            overlay.ShowMode(mode == RemoteMode.Size ? "Размер" : "Гравитация");
+            RefreshHint();
+        }
 
         void LateUpdate()
         {
+            if (restarting)
+                return;
+            if (stage != Stage.Complete && switchMode.WasPressedThisFrame())
+                SetMode(mode == RemoteMode.Size ? RemoteMode.Gravity : RemoteMode.Size);
+
             Collider target = stage switch
             {
                 Stage.Weight => weight,
@@ -72,7 +106,7 @@ namespace Warehouse
                 Stage.Box => box,
                 _ => null,
             };
-            hints.Place(player.Camera.transform);
+            overlay.Place(player.Camera.transform, leftController);
             AimAndActivate(target);
 
             switch (stage)
@@ -109,35 +143,40 @@ namespace Warehouse
         {
             Vector3 direction = rightController.forward;
             Vector3 origin = rightController.position + direction * 0.07f;
-            var hintHit = hints.Intersect(new Ray(origin, direction), out Vector3 hintPoint);
-            bool onButton = hintHit == WarehouseHints.Hit.Button;
-            hints.SetHovered(onButton);
+            var overlayHit = overlay.Intersect(new Ray(origin, direction), out Vector3 overlayPoint);
+            bool onHintToggle = overlayHit == WarehouseOverlay.Hit.ToggleHints;
+            bool onRestart = overlayHit == WarehouseOverlay.Hit.Restart;
+            bool onButton = onHintToggle || onRestart;
+            overlay.SetHovered(overlayHit);
 
             bool complete = stage == Stage.Complete;
             bool pressed = activate.action.WasPressedThisFrame();
-            if (complete && onButton && pressed)
+            if (onRestart && pressed)
             {
-                if (!restarting)
-                {
-                    restarting = true;
-                    SceneManager.LoadSceneAsync(gameObject.scene.path, LoadSceneMode.Single);
-                }
+                restarting = true;
+                SceneManager.LoadSceneAsync(gameObject.scene.path, LoadSceneMode.Single);
                 return;
             }
 
-            bool shortcut = !complete && hints.ShortcutPressed;
-            if (shortcut || (onButton && pressed))
-                hints.Toggle();
+            bool shortcut = !complete && overlay.ShortcutPressed;
+            if (shortcut || (onHintToggle && pressed))
+                overlay.Toggle();
 
             aimLine.enabled = target != null || onButton || complete;
             bool hitScene = Physics.Raycast(origin, direction, out RaycastHit result, AimRange,
                 Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore);
-            bool onTarget = hintHit == WarehouseHints.Hit.None && hitScene && result.collider == target;
+            bool modeMatches = stage switch
+            {
+                Stage.Weight => mode == RemoteMode.Size,
+                Stage.Box => mode == RemoteMode.Gravity,
+                _ => true,
+            };
+            bool onTarget = overlayHit == WarehouseOverlay.Hit.None && modeMatches && hitScene && result.collider == target;
             pressurePlate.SetHighlighted(stage == Stage.Weight && onTarget);
 
             Vector3 end = hitScene ? result.point : origin + direction * AimRange;
-            if (hintHit != WarehouseHints.Hit.None)
-                end = hintPoint;
+            if (overlayHit != WarehouseOverlay.Hit.None)
+                end = overlayPoint;
             aimLine.SetPosition(0, origin);
             aimLine.SetPosition(1, end);
             aimLine.startColor = aimLine.endColor = onTarget || onButton ? TargetColor : AimColor;
@@ -150,20 +189,29 @@ namespace Warehouse
             stage = next;
             if (stage == Stage.Complete)
             {
-                hints.ShowCompletion();
+                overlay.ShowCompletion();
                 return;
             }
 
+            RefreshHint();
+        }
+
+        void RefreshHint()
+        {
             var (title, instructions) = stage switch
             {
-                Stage.Weight => ("Уменьши гирю", "Наведи луч правой рукой на гирю и нажми курок."),
+                Stage.Weight when mode != RemoteMode.Size =>
+                    ("Уменьши гирю", "Нажми A для режима «Размер». Наведи луч на гирю и нажми курок."),
+                Stage.Weight => ("Уменьши гирю", "Наведи правый луч на гирю и нажми курок."),
                 Stage.Vent => ("Пройди через вентиляцию", "Левым стиком переместись к решётке. Наведи правый луч на проём и нажми курок."),
                 Stage.Arriving => ("Переход на полку", ""),
-                Stage.Box => ("Подними ящик", "С полки наведи правый луч на ящик внизу и нажми курок."),
+                Stage.Box when mode != RemoteMode.Gravity =>
+                    ("Подними ящик", "Нажми A для режима «Гравитация». Наведи луч на ящик и нажми курок."),
+                Stage.Box => ("Подними ящик", "Наведи правый луч на ящик внизу и нажми курок."),
                 Stage.Lifting => ("Ящик поднимается", "Дождись фиксации ящика в пазу."),
                 _ => ("Доберись до выхода", "Левым стиком телепортируйся на балкон к двери с надписью EXIT."),
             };
-            hints.Show(title, instructions);
+            overlay.Show(title, instructions);
         }
 
         void ActivateTarget()

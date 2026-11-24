@@ -5493,6 +5493,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   player: {fileID: 1326077719}
+  leftController: {fileID: 1757641368}
   rightController: {fileID: 545519882}
   activate: {fileID: 83097790271614945, guid: 3a51ab4882c6c46ab927264e63d16c95, type: 3}
   teleport: {fileID: 1326077714}

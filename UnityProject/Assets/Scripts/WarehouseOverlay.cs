@@ -5,38 +5,37 @@ using UnityEngine.UI;
 
 namespace Warehouse
 {
-    sealed class WarehouseHints : IDisposable
+    sealed class WarehouseOverlay : IDisposable
     {
-        public enum Hit { None, Panel, Button }
+        public enum Hit { None, Panel, ToggleHints, Restart }
 
         static readonly Color ButtonColor = new(0.13f, 0.27f, 0.36f, 1f);
         static readonly Color HoverColor = new(0.20f, 0.42f, 0.52f, 1f);
         static readonly Vector2 CardSize = new(620f, 230f);
-        static readonly Vector3 PanelOffset = new(-0.15f, 0.27f, 1.4f);
+        static readonly Vector3 PanelOffset = new(-0.43f, 0.40f, 1.45f);
+        static readonly Vector3 WristOffset = new(0.04f, 0.055f, -0.067f);
         const float ButtonHeight = 48f;
         const float ButtonRight = 290f;
 
         readonly RectTransform panel;
         readonly RectTransform card;
-        readonly Image button;
+        readonly Image hintButton;
+        readonly Image restartButton;
         readonly Text title;
         readonly Text instructions;
-        readonly Text buttonLabel;
+        readonly Text hintLabel;
+        readonly Text restartLabel;
+        readonly RectTransform modePanel;
+        readonly Text modeLabel;
         readonly Material overlay;
         readonly InputAction shortcut;
         Vector3 heading = Vector3.forward;
         Vector3 offset = PanelOffset;
+        bool showMode = true;
 
-        public WarehouseHints(Camera camera, Transform parent)
+        public WarehouseOverlay(Camera camera, Transform parent)
         {
-            var canvas = new GameObject("Route Hints", typeof(RectTransform), typeof(Canvas)).GetComponent<Canvas>();
-            canvas.renderMode = RenderMode.WorldSpace;
-            canvas.worldCamera = camera;
-            canvas.sortingOrder = 20;
-
-            panel = (RectTransform)canvas.transform;
-            panel.SetParent(parent, false);
-            panel.sizeDelta = CardSize;
+            panel = CreateCanvas("Route Overlay", camera, parent, CardSize, 20);
             panel.localScale = Vector3.one * 0.0012f;
 
             overlay = new Material(Resources.Load<Shader>("WarehouseHintOverlay"));
@@ -48,10 +47,22 @@ namespace Warehouse
             title.fontStyle = FontStyle.Bold;
             instructions = AddText("Instructions", card, font, 28, new Vector2(564f, 96f), new Vector2(0f, -3f),
                 Color.white, TextAnchor.UpperLeft);
-            button = AddImage("Toggle Hints", panel, new Vector2(174f, ButtonHeight), Vector2.zero, ButtonColor);
-            buttonLabel = AddText("Button Label", button.rectTransform, font, 24,
-                button.rectTransform.sizeDelta, Vector2.zero, Color.white, TextAnchor.MiddleCenter);
+            hintButton = AddImage("Toggle Hints", panel, new Vector2(174f, ButtonHeight), Vector2.zero, ButtonColor);
+            hintLabel = AddText("Button Label", hintButton.rectTransform, font, 24,
+                hintButton.rectTransform.sizeDelta, Vector2.zero, Color.white, TextAnchor.MiddleCenter);
+            Vector2 restartSize = new(218f, ButtonHeight);
+            restartButton = AddImage("Restart Level", panel, restartSize, new Vector2(-181f, -80f), ButtonColor);
+            restartLabel = AddText("Button Label", restartButton.rectTransform, font, 24,
+                restartSize, Vector2.zero, Color.white, TextAnchor.MiddleCenter);
+            restartLabel.text = "Начать заново";
             SetVisible(true);
+
+            Vector2 modeSize = new(330f, 64f);
+            modePanel = CreateCanvas("Controller Mode", camera, parent, modeSize, 15);
+            AddImage("Mode Background", modePanel, modeSize, Vector2.zero, new Color(0.06f, 0.11f, 0.15f, 0.95f));
+            modeLabel = AddText("Mode Label", modePanel, font, 32, new Vector2(300f, 54f),
+                Vector2.zero, Color.white, TextAnchor.MiddleCenter);
+            modeLabel.fontStyle = FontStyle.Bold;
 
             shortcut = new InputAction("Toggle Hints", InputActionType.Button,
                 "<XRController>{LeftHand}/{PrimaryButton}");
@@ -67,7 +78,9 @@ namespace Warehouse
             instructions.text = instructionsText;
         }
 
-        public void Place(Transform camera)
+        public void ShowMode(string mode) => modeLabel.text = mode + " · A";
+
+        public void Place(Transform camera, Transform leftController)
         {
             Vector3 forward = camera.forward;
             Vector3 flatForward = Vector3.ProjectOnPlane(forward, Vector3.up);
@@ -78,6 +91,16 @@ namespace Warehouse
             Quaternion rotation = Quaternion.LookRotation(heading, Vector3.up) *
                 Quaternion.Euler(Mathf.Clamp(pitch, -65f, 65f), 0f, 0f);
             panel.SetPositionAndRotation(camera.position + rotation * offset, rotation);
+
+            Vector3 modePosition = leftController.TransformPoint(WristOffset);
+            Vector3 eyeToMode = modePosition - camera.position;
+            bool modeVisible = showMode && Vector3.Dot(eyeToMode, forward) > 0.22f;
+            modePanel.gameObject.SetActive(modeVisible);
+            if (modeVisible)
+            {
+                modePanel.SetPositionAndRotation(modePosition, Quaternion.LookRotation(eyeToMode, camera.up));
+                modePanel.localScale = Vector3.one * (0.0009f * Mathf.Min(eyeToMode.magnitude, 0.85f));
+            }
         }
 
         public Hit Intersect(Ray ray, out Vector3 point)
@@ -88,21 +111,31 @@ namespace Warehouse
                 return Hit.None;
 
             point = ray.GetPoint(distance);
-            var buttonRect = button.rectTransform;
-            if (buttonRect.rect.Contains(buttonRect.InverseTransformPoint(point)))
-                return Hit.Button;
+            if (hintButton.gameObject.activeSelf && Contains(hintButton.rectTransform, point))
+                return Hit.ToggleHints;
+            if (Contains(restartButton.rectTransform, point))
+                return Hit.Restart;
 
-            return card.gameObject.activeSelf && card.rect.Contains(card.InverseTransformPoint(point))
+            return card.gameObject.activeSelf && Contains(card, point)
                 ? Hit.Panel
                 : Hit.None;
         }
 
-        public void SetHovered(bool hovered) => button.color = hovered ? HoverColor : ButtonColor;
+        static bool Contains(RectTransform bounds, Vector3 point) => bounds.rect.Contains(bounds.InverseTransformPoint(point));
+
+        public void SetHovered(Hit hit)
+        {
+            hintButton.color = hit == Hit.ToggleHints ? HoverColor : ButtonColor;
+            restartButton.color = hit == Hit.Restart ? HoverColor : ButtonColor;
+        }
 
         public void Toggle() => SetVisible(!card.gameObject.activeSelf);
 
         public void ShowCompletion()
         {
+            showMode = false;
+            modePanel.gameObject.SetActive(false);
+            hintButton.gameObject.SetActive(false);
             offset = new Vector3(0f, 0.1f, 1.4f);
             card.sizeDelta = new Vector2(560f, 206f);
             card.gameObject.SetActive(true);
@@ -112,29 +145,41 @@ namespace Warehouse
             title.rectTransform.sizeDelta = new Vector2(520f, 58f);
             title.rectTransform.anchoredPosition = new Vector2(0f, 38f);
             instructions.gameObject.SetActive(false);
-            SetButton(new Vector2(304f, 58f), new Vector2(0f, -39f), "Пройти заново");
+            SetButton(restartButton, restartLabel, new Vector2(304f, 58f), new Vector2(0f, -39f), "Пройти заново");
         }
 
         void SetVisible(bool visible)
         {
             card.gameObject.SetActive(visible);
             float width = visible ? 174f : 325f;
-            SetButton(new Vector2(width, ButtonHeight), new Vector2(ButtonRight - width * 0.5f, -80f),
+            SetButton(hintButton, hintLabel, new Vector2(width, ButtonHeight), new Vector2(ButtonRight - width * 0.5f, -80f),
                 visible ? "Скрыть · X" : "Показать подсказки · X");
         }
 
-        void SetButton(Vector2 size, Vector2 position, string label)
+        static void SetButton(Image button, Text text, Vector2 size, Vector2 position, string label)
         {
             button.rectTransform.sizeDelta = size;
             button.rectTransform.anchoredPosition = position;
-            buttonLabel.rectTransform.sizeDelta = size;
-            buttonLabel.text = label;
+            text.rectTransform.sizeDelta = size;
+            text.text = label;
         }
 
         public void Dispose()
         {
             shortcut.Dispose();
             UnityEngine.Object.Destroy(overlay);
+        }
+
+        static RectTransform CreateCanvas(string name, Camera camera, Transform parent, Vector2 size, int order)
+        {
+            var canvas = new GameObject(name, typeof(RectTransform), typeof(Canvas)).GetComponent<Canvas>();
+            canvas.renderMode = RenderMode.WorldSpace;
+            canvas.worldCamera = camera;
+            canvas.sortingOrder = order;
+            var rect = (RectTransform)canvas.transform;
+            rect.SetParent(parent, false);
+            rect.sizeDelta = size;
+            return rect;
         }
 
         Image AddImage(string name, RectTransform parent, Vector2 size, Vector2 position, Color color)

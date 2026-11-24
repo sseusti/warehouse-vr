@@ -49,6 +49,8 @@ namespace Warehouse
         public event Action Changed;
 
         public float Scale => scale;
+        /// <summary>Scale the player ends up with after the current or last change.</summary>
+        public float TargetScale => settings.Step(stepIndex);
         public bool IsChanging => elapsed >= 0f;
         public bool IsNormalSize => stepIndex == 0 && !IsChanging;
         public bool FitsVent => !IsChanging && scale <= settings.VentMaxScale + 0.001f;

@@ -6,6 +6,7 @@ using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.XR.Interaction.Toolkit.Inputs;
+using UnityEngine.XR.Interaction.Toolkit.Inputs.Haptics;
 using UnityEngine.XR.Interaction.Toolkit.Interactors;
 using UnityEngine.XR.Interaction.Toolkit.Locomotion.Teleportation;
 using static Warehouse.Editor.DayOneScenes;
@@ -18,6 +19,7 @@ namespace Warehouse.Editor
         public const string ScenePath = Folder + "/Warehouse.unity";
         const string ScaleSettingsPath = Folder + "/PlayerScaleSettings.asset";
         const string GravityPresetsPath = Folder + "/GravityPresets.asset";
+        const string FeedbackSettingsPath = Folder + "/RemoteFeedbackSettings.asset";
         const float BoxYaw = 103f;
         const float BoxMass = 20f;
         const float PlatformHeight = 1.65f;
@@ -79,6 +81,16 @@ namespace Warehouse.Editor
             route.aimLine.positionCount = 2;
             route.aimLine.widthMultiplier = 0.008f;
             route.aimLine.enabled = false;
+
+            var haptics = route.rightController.gameObject.AddComponent<HapticImpulsePlayer>();
+            haptics.hapticOutput = new XRInputHapticImpulseProvider("Haptic")
+            {
+                inputActionReference = Action(input, "XRI Right/Haptic Device"),
+            };
+            var feedback = route.gameObject.AddComponent<RemoteFeedback>();
+            feedback.Configure(LoadOrCreate<RemoteFeedbackSettings>(FeedbackSettingsPath), haptics,
+                route.aimLine.sharedMaterial);
+            route.ConfigureFeedback(feedback);
 
             var floor = Material("Floor", new Color(0.35f, 0.39f, 0.42f));
             var wall = Material("Wall", new Color(0.26f, 0.32f, 0.37f));

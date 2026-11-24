@@ -35,6 +35,7 @@ namespace Warehouse
         [SerializeField] private PlayerScaler scaler;
         [SerializeField] private GravityBody boxGravity;
         [SerializeField] private GravitySocket boxSocket;
+        [SerializeField] private RemoteFeedback feedback;
 
         const float AimRange = 7f;
         static readonly Color AimColor = new(0.73f, 0.81f, 0.9f, 0.55f);
@@ -49,6 +50,7 @@ namespace Warehouse
         InputAction switchMode;
         bool restarting;
         float aimWidth;
+        bool wasAiming;
 
         Vector3 PlayerFloor => scaler.Floor;
 
@@ -56,6 +58,8 @@ namespace Warehouse
             stage is Stage.Vent or Stage.Box or Stage.Balcony;
 
         public void ConfigureScaler(PlayerScaler value) => scaler = value;
+
+        public void ConfigureFeedback(RemoteFeedback value) => feedback = value;
 
         public void ConfigureBox(GravityBody gravity, GravitySocket socket)
         {
@@ -108,7 +112,10 @@ namespace Warehouse
             if (restarting)
                 return;
             if (stage != Stage.Complete && switchMode.WasPressedThisFrame())
+            {
                 SetMode(mode == RemoteMode.Size ? RemoteMode.Gravity : RemoteMode.Size);
+                feedback.ModeSwitched(rightController.position);
+            }
 
             Collider target = stage switch
             {
@@ -126,6 +133,7 @@ namespace Warehouse
                     if (pressurePlate.IsReleased)
                     {
                         grate.SetActive(false);
+                        feedback.Succeeded(grate.transform.position);
                         SetStage(Stage.Vent);
                         Debug.Log("Warehouse pressure plate released.");
                     }
@@ -138,6 +146,7 @@ namespace Warehouse
                     if (boxSocket.IsFilled)
                     {
                         balconyPad.gameObject.SetActive(true);
+                        feedback.Succeeded(box.transform.position);
                         SetStage(Stage.Balcony);
                         Debug.Log("Warehouse box docked.");
                     }
@@ -148,6 +157,7 @@ namespace Warehouse
                         balconyPad.enabled = false;
                         exitSign.text = "COMPLETE";
                         exitSign.color = new Color(0.4f, 1f, 0.7f);
+                        feedback.Succeeded(player.Camera.transform.position + player.Camera.transform.forward);
                         SetStage(Stage.Complete);
                         Debug.Log("Warehouse route complete.");
                     }
@@ -167,6 +177,8 @@ namespace Warehouse
 
             bool complete = stage == Stage.Complete;
             bool pressed = activate.action.WasPressedThisFrame();
+            if (onButton && pressed)
+                feedback.Pressed(overlayPoint);
             if (onRestart && pressed)
             {
                 restarting = true;
@@ -211,12 +223,28 @@ namespace Warehouse
             aimLine.SetPosition(1, end);
             aimLine.startColor = aimLine.endColor = forbidden ? ForbiddenColor
                 : onTarget || onButton || onSelf ? TargetColor : AimColor;
+
+            bool aiming = onTarget || onSelf || onButton;
+            if (aiming && !wasAiming)
+                feedback.Hover();
+            wasAiming = aiming;
+
             if (!pressed || shortcut)
                 return;
             if (onSelf)
+            {
                 scaler.ChangeToNextStep();
+                feedback.Applied(end, feedback.PitchForScale(scaler.TargetScale));
+            }
             else if (onTarget)
-                ActivateTarget();
+            {
+                ActivateTarget(result.point);
+            }
+            else if (onCollider)
+            {
+                // Right object, but the remote cannot act on it now: wrong mode or too big for the vent.
+                feedback.Denied(result.point);
+            }
         }
 
         void SetStage(Stage next)
@@ -257,12 +285,13 @@ namespace Warehouse
             overlay.Show(title, instructions);
         }
 
-        void ActivateTarget()
+        void ActivateTarget(Vector3 point)
         {
             switch (stage)
             {
                 case Stage.Weight:
                     pressurePlate.Shrink();
+                    feedback.Applied(point, feedback.PitchForScale(WeightPressurePlate.SmallScale));
                     break;
                 case Stage.Vent:
                     startPad.enabled = false;
@@ -273,10 +302,12 @@ namespace Warehouse
                         destinationRotation = shelfArrival.rotation,
                         matchOrientation = MatchOrientation.TargetUpAndForward,
                     });
+                    feedback.Applied(point, 1.2f);
                     SetStage(Stage.Arriving);
                     break;
                 case Stage.Box:
                     boxGravity.NextPreset();
+                    feedback.Applied(point, feedback.PitchForGravity(boxGravity.Current));
                     RefreshHint();
                     break;
             }

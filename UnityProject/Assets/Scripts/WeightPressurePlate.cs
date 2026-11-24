@@ -7,7 +7,7 @@ namespace Warehouse
         [SerializeField] Rigidbody weight;
         [SerializeField] Transform button;
 
-        const float SmallScale = 0.5f;
+        public const float SmallScale = 0.5f;
         const float ReleaseMass = 2f;
         const float ShrinkDuration = 0.4f;
         const float ButtonTravel = 0.08f;

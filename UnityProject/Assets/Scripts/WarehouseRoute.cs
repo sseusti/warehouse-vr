@@ -36,6 +36,7 @@ namespace Warehouse
         [SerializeField] private GravityBody boxGravity;
         [SerializeField] private GravitySocket boxSocket;
         [SerializeField] private RemoteFeedback feedback;
+        [SerializeField] private UndoHistory history;
 
         const float AimRange = 7f;
         const float PlayerClearance = 0.3f;
@@ -63,6 +64,8 @@ namespace Warehouse
 
         public void ConfigureFeedback(RemoteFeedback value) => feedback = value;
 
+        public void ConfigureUndo(UndoHistory value) => history = value;
+
         public void ConfigureBox(GravityBody gravity, GravitySocket socket)
         {
             boxGravity = gravity;
@@ -83,11 +86,13 @@ namespace Warehouse
             grow = new InputAction("Grow aimed object", InputActionType.Button,
                 "<XRController>{RightHand}/{Primary2DAxis}/up");
             SetMode(RemoteMode.Size);
+            RefreshUndoHint();
         }
 
         void OnEnable()
         {
             scaler.Changed += RefreshHint;
+            history.Changed += RefreshUndoHint;
             overlay.EnableShortcut();
             switchMode.Enable();
             grow.Enable();
@@ -96,6 +101,7 @@ namespace Warehouse
         void OnDisable()
         {
             scaler.Changed -= RefreshHint;
+            history.Changed -= RefreshUndoHint;
             overlay.DisableShortcut();
             switchMode.Disable();
             grow.Disable();
@@ -117,6 +123,7 @@ namespace Warehouse
 
         void LateUpdate()
         {
+            UpdateUndoBlock();
             if (restarting)
                 return;
             if (stage != Stage.Complete && switchMode.WasPressedThisFrame())
@@ -154,6 +161,8 @@ namespace Warehouse
                     if (boxSocket.IsFilled)
                     {
                         balconyPad.gameObject.SetActive(true);
+                        // The docked box stays in its slot; its gravity changes cannot be undone any more.
+                        history.Forget(boxGravity);
                         feedback.Succeeded(box.transform.position);
                         SetStage(Stage.Balcony);
                         Debug.Log("Warehouse box docked.");
@@ -171,7 +180,12 @@ namespace Warehouse
                     }
                     break;
             }
+            UpdateUndoBlock();
         }
+
+        // Called before and after the frame's actions, so B never lands in the middle of a transition.
+        void UpdateUndoBlock() =>
+            history.Blocked = restarting || stage is Stage.Arriving or Stage.Complete || scaler.IsChanging;
 
         void AimAndActivate(Collider target)
         {
@@ -249,8 +263,7 @@ namespace Warehouse
                 return;
             if (onSelf)
             {
-                scaler.ChangeToNextStep();
-                feedback.Applied(end, feedback.PitchForScale(scaler.TargetScale));
+                ChangeOwnSize(end);
             }
             else if (onTarget)
             {
@@ -263,14 +276,48 @@ namespace Warehouse
             }
         }
 
+        void ChangeOwnSize(Vector3 point)
+        {
+            int before = scaler.StepIndex;
+            scaler.ChangeToNextStep();
+            history.Record(new UndoStep("свой рост", scaler, () => scaler.ChangeToStep(before), fadesItself: true));
+            feedback.Applied(point, feedback.PitchForScale(scaler.TargetScale));
+        }
+
         void ResizeWeight(int direction, Vector3 point)
         {
             ScalableBody body = pressurePlate.Scalable;
-            if (body.TryStep(direction, PlayerFloor, PlayerClearance))
-                feedback.Applied(point, feedback.PitchForScale(body.TargetScale));
-            else
+            float before = body.TargetScale;
+            if (!body.TryStep(direction, PlayerFloor, PlayerClearance))
+            {
                 feedback.Denied(point);
+                return;
+            }
+
+            // Undoing a shrink makes the weight grow back, so it needs room again.
+            System.Func<bool> canRevert = direction < 0
+                ? () => body.CanGrowTo(before, PlayerFloor, PlayerClearance)
+                : null;
+            history.Record(new UndoStep("размер гири", body, () => body.SetScaleImmediate(before), canRevert));
+            feedback.Applied(point, feedback.PitchForScale(body.TargetScale));
         }
+
+        /// <summary>Undo of the vent crossing: back to the spot in front of the grate.</summary>
+        void ReturnToVent(Vector3 floor, Vector3 forward)
+        {
+            startPad.enabled = true;
+            ventPad.enabled = true;
+            balconyPad.gameObject.SetActive(false);
+            teleport.QueueTeleportRequest(new TeleportRequest
+            {
+                destinationPosition = floor,
+                destinationRotation = Quaternion.LookRotation(forward, Vector3.up),
+                matchOrientation = MatchOrientation.TargetUpAndForward,
+            });
+            SetStage(Stage.Vent);
+        }
+
+        void RefreshUndoHint() => overlay.ShowUndo(history.Last?.Label);
 
         void SetStage(Stage next)
         {
@@ -319,6 +366,12 @@ namespace Warehouse
                     ResizeWeight(-1, point);
                     break;
                 case Stage.Vent:
+                    Vector3 floor = PlayerFloor;
+                    Vector3 forward = Vector3.ProjectOnPlane(player.Camera.transform.forward, Vector3.up);
+                    if (forward.sqrMagnitude < 0.001f)
+                        forward = player.transform.forward;
+                    history.Record(new UndoStep("переход через вентиляцию", vent,
+                        () => ReturnToVent(floor, forward.normalized)));
                     startPad.enabled = false;
                     ventPad.enabled = false;
                     teleport.QueueTeleportRequest(new TeleportRequest
@@ -331,7 +384,14 @@ namespace Warehouse
                     SetStage(Stage.Arriving);
                     break;
                 case Stage.Box:
+                    int preset = boxGravity.PresetIndex;
+                    Vector3 position = boxGravity.Body.position;
                     boxGravity.NextPreset();
+                    history.Record(new UndoStep("гравитация ящика", boxGravity, () =>
+                    {
+                        boxGravity.Restore(preset, position);
+                        RefreshHint();
+                    }));
                     feedback.Applied(point, feedback.PitchForGravity(boxGravity.Current));
                     RefreshHint();
                     break;

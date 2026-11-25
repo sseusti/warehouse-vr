@@ -22,6 +22,7 @@ namespace Warehouse.Editor
         const string FeedbackSettingsPath = Folder + "/RemoteFeedbackSettings.asset";
         const string PlateSettingsPath = Folder + "/PressurePlateSettings.asset";
         const string ScaleStepSettingsPath = Folder + "/ScaleStepSettings.asset";
+        const string UndoSettingsPath = Folder + "/UndoSettings.asset";
         const float BoxYaw = 103f;
         const float BoxMass = 20f;
         const float PlatformHeight = 1.65f;
@@ -93,6 +94,10 @@ namespace Warehouse.Editor
             feedback.Configure(LoadOrCreate<RemoteFeedbackSettings>(FeedbackSettingsPath), haptics,
                 route.aimLine.sharedMaterial);
             route.ConfigureFeedback(feedback);
+            var history = route.gameObject.AddComponent<UndoHistory>();
+            history.Configure(LoadOrCreate<UndoSettings>(UndoSettingsPath), feedback, route.rightController,
+                route.player.Camera);
+            route.ConfigureUndo(history);
 
             var floor = Material("Floor", new Color(0.35f, 0.39f, 0.42f));
             var wall = Material("Wall", new Color(0.26f, 0.32f, 0.37f));

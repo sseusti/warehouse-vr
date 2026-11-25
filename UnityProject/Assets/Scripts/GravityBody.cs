@@ -28,6 +28,7 @@ namespace Warehouse
         public bool IsLocked { get; private set; }
         public Rigidbody Body => body;
         public GravityPresets.Preset Current => presets[presetIndex];
+        public int PresetIndex => presetIndex;
 
         public void Configure(GravityPresets values, float yaw)
         {
@@ -50,6 +51,19 @@ namespace Warehouse
         {
             if (!IsLocked)
                 Apply((presetIndex + 1) % presets.Count);
+        }
+
+        /// <summary>Puts the body back at rest with an earlier preset, for example when undoing.</summary>
+        public void Restore(int index, Vector3 position)
+        {
+            if (IsLocked)
+                return;
+
+            body.linearVelocity = Vector3.zero;
+            body.angularVelocity = Vector3.zero;
+            body.position = position;
+            transform.position = position;
+            Apply(index);
         }
 
         /// <summary>Fixes the body in place, for example inside a socket.</summary>

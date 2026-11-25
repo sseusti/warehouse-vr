@@ -1,7 +1,6 @@
 using System;
 using Unity.XR.CoreUtils;
 using UnityEngine;
-using UnityEngine.UI;
 using UnityEngine.XR.Interaction.Toolkit.Interactors;
 using UnityEngine.XR.Interaction.Toolkit.Interactors.Visuals;
 
@@ -20,7 +19,6 @@ namespace Warehouse
 
         const float SelfTargetRadius = 0.3f;
         const float SelfTargetLift = 0.02f;
-        const float FadeDistance = 0.2f;
         static readonly int ColorProperty = Shader.PropertyToID("_Color");
         static readonly Color SelfTargetColor = new(0.94f, 0.57f, 0.18f, 1f);
         static readonly Color SelfTargetHighlight = new(1f, 0.86f, 0.40f, 1f);
@@ -38,8 +36,7 @@ namespace Warehouse
         float baseRayVelocity;
         XRInteractorLineVisual teleportLine;
         float baseLineWidth;
-        Image fade;
-        Material fadeMaterial;
+        ViewFade fade;
         Transform selfTarget;
         Renderer selfTargetRenderer;
         MaterialPropertyBlock selfTargetProperties;
@@ -49,6 +46,8 @@ namespace Warehouse
         public event Action Changed;
 
         public float Scale => scale;
+        /// <summary>Index of the size step the player has or is changing to; 0 is normal size.</summary>
+        public int StepIndex => stepIndex;
         /// <summary>Scale the player ends up with after the current or last change.</summary>
         public float TargetScale => settings.Step(stepIndex);
         public bool IsChanging => elapsed >= 0f;
@@ -88,23 +87,25 @@ namespace Warehouse
                     baseLineWidth = teleportLine.lineWidth;
             }
 
-            CreateFade();
+            fade = new ViewFade(view, "Scale Fade");
             CreateSelfTarget();
         }
 
         void OnDestroy()
         {
-            if (fadeMaterial != null)
-                Destroy(fadeMaterial);
+            fade?.Dispose();
         }
 
         /// <summary>Starts the change to the next size step, wrapping back to normal size.</summary>
-        public void ChangeToNextStep()
+        public void ChangeToNextStep() => ChangeToStep((stepIndex + 1) % settings.StepCount);
+
+        /// <summary>Starts the change to a given size step, for example when undoing a change.</summary>
+        public void ChangeToStep(int index)
         {
-            if (IsChanging)
+            if (IsChanging || index == stepIndex || index < 0 || index >= settings.StepCount)
                 return;
 
-            stepIndex = (stepIndex + 1) % settings.StepCount;
+            stepIndex = index;
             startScale = scale;
             targetScale = settings.Step(stepIndex);
             pivot = Floor;
@@ -184,33 +185,7 @@ namespace Warehouse
                 teleportLine.lineWidth = baseLineWidth * value;
         }
 
-        void CreateFade()
-        {
-            var canvas = new GameObject("Scale Fade", typeof(RectTransform), typeof(Canvas)).GetComponent<Canvas>();
-            canvas.renderMode = RenderMode.WorldSpace;
-            canvas.worldCamera = view;
-            canvas.sortingOrder = 10;
-            var rect = (RectTransform)canvas.transform;
-            rect.SetParent(view.transform, false);
-            rect.localPosition = Vector3.forward * FadeDistance;
-            rect.localRotation = Quaternion.identity;
-            rect.sizeDelta = new Vector2(100f, 100f);
-            rect.localScale = Vector3.one * 0.02f;
-
-            fadeMaterial = new Material(Resources.Load<Shader>("WarehouseHintOverlay"));
-            fade = new GameObject("Darkness", typeof(RectTransform), typeof(Image)).GetComponent<Image>();
-            fade.rectTransform.SetParent(rect, false);
-            fade.rectTransform.sizeDelta = rect.sizeDelta;
-            fade.material = fadeMaterial;
-            fade.raycastTarget = false;
-            SetFade(0f);
-        }
-
-        void SetFade(float alpha)
-        {
-            fade.color = new Color(0f, 0f, 0f, alpha);
-            fade.enabled = alpha > 0.001f;
-        }
+        void SetFade(float alpha) => fade.SetAlpha(alpha);
 
         void CreateSelfTarget()
         {

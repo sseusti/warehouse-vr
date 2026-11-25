@@ -67,14 +67,18 @@ namespace Warehouse
             float next = Mathf.Round((target + direction * settings.Step) * 100f) / 100f;
             if (next < settings.MinScale - 0.001f || next > settings.MaxScale + 0.001f)
                 return false;
-            if (direction > 0 && !HasRoom(next))
-                return false;
-            if (direction > 0 && keepOut.HasValue && Reaches(next, keepOut.Value, clearance))
+            if (direction > 0 && !CanGrowTo(next, keepOut, clearance))
                 return false;
 
             target = next;
             return true;
         }
+
+        /// <summary>
+        /// True when the body has room to grow to <paramref name="value"/> and stays clear of <paramref name="keepOut"/>.
+        /// </summary>
+        public bool CanGrowTo(float value, Vector3? keepOut, float clearance) =>
+            HasRoom(value) && !(keepOut.HasValue && Reaches(value, keepOut.Value, clearance));
 
         /// <summary>Jumps to a scale without animation, for example when undoing an action.</summary>
         public void SetScaleImmediate(float value)

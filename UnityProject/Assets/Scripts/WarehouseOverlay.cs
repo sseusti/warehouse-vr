@@ -25,6 +25,7 @@ namespace Warehouse
         readonly Text instructions;
         readonly Text hintLabel;
         readonly Text restartLabel;
+        readonly Text undoLabel;
         readonly RectTransform modePanel;
         readonly Text modeLabel;
         readonly Material overlay;
@@ -47,6 +48,9 @@ namespace Warehouse
             title.fontStyle = FontStyle.Bold;
             instructions = AddText("Instructions", card, font, 28, new Vector2(564f, 96f), new Vector2(0f, -3f),
                 Color.white, TextAnchor.UpperLeft);
+            undoLabel = AddText("Undo Hint", card, font, 24, new Vector2(564f, 34f), new Vector2(0f, -91f),
+                new Color(0.62f, 0.74f, 0.82f), TextAnchor.MiddleLeft);
+            ShowUndo(null);
             hintButton = AddImage("Toggle Hints", panel, new Vector2(174f, ButtonHeight), Vector2.zero, ButtonColor);
             hintLabel = AddText("Button Label", hintButton.rectTransform, font, 24,
                 hintButton.rectTransform.sizeDelta, Vector2.zero, Color.white, TextAnchor.MiddleCenter);
@@ -77,6 +81,10 @@ namespace Warehouse
             title.text = headingText;
             instructions.text = instructionsText;
         }
+
+        /// <summary>Shows what button B would take back; null when there is nothing to undo.</summary>
+        public void ShowUndo(string label) =>
+            undoLabel.text = label != null ? $"B — отменить: {label}" : "B — отменять пока нечего";
 
         public void ShowMode(string mode) => modeLabel.text = mode + " · A";
 
@@ -145,6 +153,7 @@ namespace Warehouse
             title.rectTransform.sizeDelta = new Vector2(520f, 58f);
             title.rectTransform.anchoredPosition = new Vector2(0f, 38f);
             instructions.gameObject.SetActive(false);
+            undoLabel.gameObject.SetActive(false);
             SetButton(restartButton, restartLabel, new Vector2(304f, 58f), new Vector2(0f, -39f), "Пройти заново");
         }
 

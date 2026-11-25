@@ -30,6 +30,7 @@ namespace Warehouse
         [SerializeField] private Pulse apply = new(0.5f, 0.12f);
         [SerializeField] private Pulse deny = new(0.35f, 0.08f);
         [SerializeField] private Pulse success = new(0.7f, 0.2f);
+        [SerializeField] private Pulse undo = new(0.4f, 0.1f);
 
         [Header("Particles")]
         [SerializeField, Range(1, 64)] private int burstCount = 24;
@@ -43,6 +44,7 @@ namespace Warehouse
         public Pulse Apply => apply;
         public Pulse Deny => deny;
         public Pulse Success => success;
+        public Pulse Undo => undo;
         public int BurstCount => burstCount;
         public Color ParticleColor => particleColor;
         public Color DenyColor => denyColor;

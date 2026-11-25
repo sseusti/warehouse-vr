@@ -21,6 +21,7 @@ namespace Warehouse
         AudioClip click;
         AudioClip buzz;
         AudioClip thud;
+        AudioClip rewind;
         AudioSource[] sources;
         int nextSource;
         SparkBurst sparks;
@@ -38,6 +39,7 @@ namespace Warehouse
             click = Synthesize("Remote Click", 0.06f, Click);
             buzz = Synthesize("Remote Deny", 0.26f, Buzz);
             thud = Synthesize("Remote Success", 0.45f, Thud);
+            rewind = Synthesize("Remote Undo", 0.3f, Rewind);
 
             sources = new AudioSource[SourceCount];
             for (int i = 0; i < SourceCount; i++)
@@ -63,6 +65,7 @@ namespace Warehouse
             Destroy(click);
             Destroy(buzz);
             Destroy(thud);
+            Destroy(rewind);
         }
 
         /// <summary>Pitch for a size change: smaller objects sound higher.</summary>
@@ -105,6 +108,13 @@ namespace Warehouse
             Play(thud, point, 1f);
             Burst(point, settings.ParticleColor, settings.BurstCount * 2);
             Vibrate(settings.Success);
+        }
+
+        /// <summary>The last remote action was taken back.</summary>
+        public void Undone(Vector3 position)
+        {
+            Play(rewind, position, 1f);
+            Vibrate(settings.Undo);
         }
 
         float ClampPitch(float pitch) => Mathf.Clamp(pitch, settings.PitchRange.x, settings.PitchRange.y);
@@ -150,6 +160,17 @@ namespace Warehouse
             float phase = 2f * Mathf.PI * (1100f * t - (1100f - 280f) * t * t / (2f * length));
             float envelope = Mathf.Min(1f, t * 400f) * Mathf.Exp(-4f * progress);
             return 0.5f * envelope * (Mathf.Sin(phase) + 0.25f * Mathf.Sin(2f * phase));
+        }
+
+        // Rising sweep with a fast flutter, like a tape rewinding: the zap played backwards.
+        static float Rewind(float t, float length)
+        {
+            float progress = t / length;
+            // Phase of a linear sweep from 300 Hz to 1000 Hz.
+            float phase = 2f * Mathf.PI * (300f * t + (1000f - 300f) * t * t / (2f * length));
+            float flutter = 0.65f + 0.35f * Mathf.Sin(2f * Mathf.PI * 32f * t);
+            float envelope = Mathf.Min(1f, t * 60f) * Mathf.Min(1f, (length - t) * 40f) * (0.5f + 0.5f * progress);
+            return 0.4f * envelope * flutter * Mathf.Sin(phase);
         }
 
         static float Click(float t, float length)

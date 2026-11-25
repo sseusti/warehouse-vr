@@ -13,6 +13,7 @@ namespace Warehouse
         public InputActionReference activate;
         public LineRenderer pointer;
         public string room;
+        public InteractionFeedback feedback;
         static readonly string[] Labels = { "Сюжет", "Песочница", "Тестовая комната", "Настройки" };
         static readonly Color Idle = new(0.13f, 0.26f, 0.32f);
         static readonly Color Selected = new(0.13f, 0.48f, 0.52f);
@@ -73,6 +74,7 @@ namespace Warehouse
                 bool hovered = intersects && button.rectTransform.rect.Contains(button.rectTransform.InverseTransformPoint(end));
                 button.color = hovered ? Selected : Idle;
                 if (!hovered || !activate.action.WasPressedThisFrame()) continue;
+                feedback.Click();
                 if (placeholder) ShowHome();
                 else if (i == 2)
                 {

@@ -66,6 +66,9 @@ namespace Warehouse
             AddImage("Mode Background", modePanel, modeSize, Vector2.zero, new Color(0.06f, 0.11f, 0.15f, 0.95f));
             modeLabel = AddText("Mode Label", modePanel, font, 32, new Vector2(300f, 54f),
                 Vector2.zero, Color.white, TextAnchor.MiddleCenter);
+            modeLabel.resizeTextForBestFit = true;
+            modeLabel.resizeTextMinSize = 21;
+            modeLabel.resizeTextMaxSize = 32;
             modeLabel.fontStyle = FontStyle.Bold;
 
             shortcut = new InputAction("Toggle Hints", InputActionType.Button,

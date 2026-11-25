@@ -24,6 +24,7 @@ namespace Warehouse.Editor
         {
             if (!AssetDatabase.IsValidFolder(Folder)) AssetDatabase.CreateFolder("Assets", "GeneratedPilot");
             DayTwoScene.EnsureScene();
+            PilotRoomScene.Generate();
             var scene = EditorSceneManager.OpenScene(DayTwoScene.ScenePath);
             var source = Object.FindFirstObjectByType<WarehouseRoute>();
             var rig = source.player.gameObject;
@@ -32,7 +33,8 @@ namespace Warehouse.Editor
             menu.hand = source.rightController;
             menu.activate = source.activate;
             menu.pointer = source.aimLine;
-            menu.room = DayTwoScene.ScenePath;
+            menu.room = PilotRoomScene.Path;
+            menu.feedback = PilotRoomScene.AddFeedback(rig, rig.GetComponent<UnityEngine.XR.Interaction.Toolkit.Inputs.InputActionManager>());
             Object.DestroyImmediate(rig.GetComponentInChildren<XRRayInteractor>().gameObject);
             rig.GetComponent<SingleSnapTurnProvider>().enabled = false;
             rig.transform.position = Vector3.zero;
@@ -42,7 +44,7 @@ namespace Warehouse.Editor
             if (!EditorSceneManager.SaveScene(scene, MenuPath, true))
                 throw new System.IO.IOException(MenuPath);
             EditorSceneManager.OpenScene(MenuPath);
-            return new[] { MenuPath, DayTwoScene.ScenePath };
+            return new[] { MenuPath, PilotRoomScene.Path };
         }
     }
 }

@@ -5,9 +5,9 @@ using UnityEngine.UI;
 
 namespace Warehouse
 {
-    sealed class WarehouseOverlay : IDisposable
+    sealed class WarehouseOverlay : WorldPanel
     {
-        public enum Hit { None, Panel, ToggleHints, Restart }
+        public enum Hit { None, Panel, ToggleHints, Restart, Menu }
 
         static readonly Color ButtonColor = new(0.13f, 0.27f, 0.36f, 1f);
         static readonly Color HoverColor = new(0.20f, 0.42f, 0.52f, 1f);
@@ -28,7 +28,7 @@ namespace Warehouse
         readonly Text restartLabel;
         readonly RectTransform modePanel;
         readonly Text modeLabel;
-        readonly Material overlay;
+        bool hasMenu;
         readonly InputAction shortcut;
         Vector3 heading = Vector3.forward;
         Vector3 offset = PanelOffset;
@@ -39,7 +39,6 @@ namespace Warehouse
             panel = CreateCanvas("Route Overlay", camera, parent, CardSize, 20);
             panel.localScale = Vector3.one * 0.0012f;
 
-            overlay = new Material(Resources.Load<Shader>("WarehouseHintOverlay"));
             var curtain = CreateCanvas("Vent Transition", camera, camera.transform, Vector2.one * 4f, 100);
             curtain.localPosition = Vector3.forward * 0.2f;
             blackout = AddImage("Blackout", curtain, curtain.sizeDelta, Vector2.zero, Color.black);
@@ -125,7 +124,7 @@ namespace Warehouse
 
             point = ray.GetPoint(distance);
             if (hintButton.gameObject.activeSelf && Contains(hintButton.rectTransform, point))
-                return Hit.ToggleHints;
+                return hasMenu ? Hit.Menu : Hit.ToggleHints;
             if (Contains(restartButton.rectTransform, point))
                 return Hit.Restart;
 
@@ -138,17 +137,18 @@ namespace Warehouse
 
         public void SetHovered(Hit hit)
         {
-            hintButton.color = hit == Hit.ToggleHints ? HoverColor : ButtonColor;
+            hintButton.color = hit == Hit.ToggleHints || hit == Hit.Menu ? HoverColor : ButtonColor;
             restartButton.color = hit == Hit.Restart ? HoverColor : ButtonColor;
         }
 
         public void Toggle() => SetVisible(!card.gameObject.activeSelf);
 
-        public void ShowCompletion()
+        public void ShowCompletion(bool menuAvailable = false)
         {
             showMode = false;
             modePanel.gameObject.SetActive(false);
-            hintButton.gameObject.SetActive(false);
+            hasMenu = menuAvailable;
+            hintButton.gameObject.SetActive(hasMenu);
             offset = new Vector3(0f, 0.1f, 1.4f);
             card.sizeDelta = new Vector2(560f, 206f);
             card.gameObject.SetActive(true);
@@ -158,7 +158,9 @@ namespace Warehouse
             title.rectTransform.sizeDelta = new Vector2(520f, 58f);
             title.rectTransform.anchoredPosition = new Vector2(0f, 38f);
             instructions.gameObject.SetActive(false);
-            SetButton(restartButton, restartLabel, new Vector2(304f, 58f), new Vector2(0f, -39f), "Пройти заново");
+            SetButton(restartButton, restartLabel, new Vector2(250f, 58f), new Vector2(hasMenu ? -132f : 0f, -39f), "Пройти заново");
+            if (hasMenu)
+                SetButton(hintButton, hintLabel, new Vector2(250f, 58f), new Vector2(132f, -39f), "В главное меню");
         }
 
         void SetVisible(bool visible)
@@ -177,51 +179,11 @@ namespace Warehouse
             text.text = label;
         }
 
-        public void Dispose()
+        public override void Dispose()
         {
             shortcut.Dispose();
-            UnityEngine.Object.Destroy(overlay);
+            base.Dispose();
         }
 
-        static RectTransform CreateCanvas(string name, Camera camera, Transform parent, Vector2 size, int order)
-        {
-            var canvas = new GameObject(name, typeof(RectTransform), typeof(Canvas)).GetComponent<Canvas>();
-            canvas.renderMode = RenderMode.WorldSpace;
-            canvas.worldCamera = camera;
-            canvas.sortingOrder = order;
-            var rect = (RectTransform)canvas.transform;
-            rect.SetParent(parent, false);
-            rect.sizeDelta = size;
-            return rect;
-        }
-
-        Image AddImage(string name, RectTransform parent, Vector2 size, Vector2 position, Color color)
-        {
-            var image = AddGraphic<Image>(name, parent, size, position);
-            image.color = color;
-            return image;
-        }
-
-        Text AddText(string name, RectTransform parent, Font font, int size, Vector2 bounds,
-            Vector2 position, Color color, TextAnchor alignment)
-        {
-            var text = AddGraphic<Text>(name, parent, bounds, position);
-            text.font = font;
-            text.fontSize = size;
-            text.alignment = alignment;
-            text.color = color;
-            return text;
-        }
-
-        T AddGraphic<T>(string name, RectTransform parent, Vector2 size, Vector2 position) where T : Graphic
-        {
-            var graphic = new GameObject(name, typeof(RectTransform), typeof(T)).GetComponent<T>();
-            graphic.rectTransform.SetParent(parent, false);
-            graphic.rectTransform.sizeDelta = size;
-            graphic.rectTransform.anchoredPosition = position;
-            graphic.material = overlay;
-            graphic.raycastTarget = false;
-            return graphic;
-        }
     }
 }

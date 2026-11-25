@@ -7,3 +7,5 @@
 /UnityProject/*.csproj
 /UnityProject/*.sln
 .DS_Store
+/UnityProject/Assets/GeneratedPilot/
+/UnityProject/Assets/GeneratedPilot.meta

@@ -171,15 +171,15 @@ namespace Warehouse
             var overlayHit = overlay.Intersect(new Ray(origin, direction), out Vector3 overlayPoint);
             bool onHintToggle = overlayHit == WarehouseOverlay.Hit.ToggleHints;
             bool onRestart = overlayHit == WarehouseOverlay.Hit.Restart;
-            bool onButton = onHintToggle || onRestart;
+            bool onButton = onHintToggle || onRestart || overlayHit == WarehouseOverlay.Hit.Menu;
             overlay.SetHovered(overlayHit);
 
             bool complete = stage == Stage.Complete;
             bool pressed = activate.action.WasPressedThisFrame();
-            if (onRestart && pressed)
+            if ((onRestart || overlayHit == WarehouseOverlay.Hit.Menu) && pressed)
             {
                 restarting = true;
-                SceneManager.LoadSceneAsync(gameObject.scene.path, LoadSceneMode.Single);
+                SceneManager.LoadSceneAsync(onRestart ? gameObject.scene.path : PilotMenu.SceneName, LoadSceneMode.Single);
                 return;
             }
 
@@ -215,7 +215,7 @@ namespace Warehouse
             stage = next;
             if (stage == Stage.Complete)
             {
-                overlay.ShowCompletion();
+                overlay.ShowCompletion(Application.CanStreamedLevelBeLoaded(PilotMenu.SceneName));
                 return;
             }
 

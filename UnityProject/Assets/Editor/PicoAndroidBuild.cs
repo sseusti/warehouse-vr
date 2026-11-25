@@ -74,8 +74,8 @@ namespace Warehouse.Editor
         [MenuItem("Warehouse/Build Pilot APK")]
         public static void BuildPilot()
         {
-            DayTwoScene.EnsureScene();
-            Build(DayTwoScene.ScenePath, "Warehouse-Pilot.apk", ApplicationId + ".pilot", "Warehouse VR Pilot");
+            var scenes = PilotScenes.Generate();
+            Build(scenes[0], "Warehouse-Pilot.apk", ApplicationId + ".pilot", "Warehouse VR Pilot", scenes);
         }
 
         static void ConfigurePlayer()
@@ -147,7 +147,7 @@ namespace Warehouse.Editor
         }
 
         static void Build(string scene, string filename, string applicationId = ApplicationId,
-            string productName = "Warehouse VR")
+            string productName = "Warehouse VR", string[] scenes = null)
         {
             if (EditorUserBuildSettings.activeBuildTarget != BuildTarget.Android)
                 throw new BuildFailedException("Switch to Android before building, or pass -buildTarget Android.");
@@ -164,7 +164,7 @@ namespace Warehouse.Editor
                 PlayerSettings.SetApplicationIdentifier(NamedBuildTarget.Android, applicationId);
                 report = BuildPipeline.BuildPlayer(new BuildPlayerOptions
                 {
-                    scenes = new[] { scene },
+                    scenes = scenes ?? new[] { scene },
                     locationPathName = Path.GetFullPath(Path.Combine("Builds", filename)),
                     target = BuildTarget.Android,
                     options = BuildOptions.Development,

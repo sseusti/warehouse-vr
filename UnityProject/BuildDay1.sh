@@ -14,7 +14,8 @@ case "${1:-both}" in
     both) build_targets=(TrackingCheck InteractionCheck) ;;
     warehouse) build_targets=(Warehouse) ;;
     weight) build_targets=(WeightCheck) ;;
-    *) printf 'Usage: %s [tracking|interaction|both|warehouse|weight]\n' "$0" >&2; exit 1 ;;
+    pilot) build_targets=(Pilot) ;;
+    *) printf 'Usage: %s [tracking|interaction|both|warehouse|weight|pilot]\n' "$0" >&2; exit 1 ;;
 esac
 
 # Unity's Android tools require an ASCII-only project path.
@@ -39,6 +40,7 @@ for target in "${build_targets[@]}"; do
         InteractionCheck) apk=Warehouse-Day1.apk ;;
         Warehouse) apk=Warehouse-Day2.apk ;;
         WeightCheck) apk=Warehouse-Weight.apk ;;
+        Pilot) apk=Warehouse-Pilot.apk ;;
     esac
     mv -f "$staging_dir/Builds/$apk" "$project_dir/Builds/$apk"
     printf 'APK built at %s\n' "$project_dir/Builds/$apk"

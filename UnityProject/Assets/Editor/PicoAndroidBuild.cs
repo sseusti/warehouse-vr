@@ -71,6 +71,13 @@ namespace Warehouse.Editor
             Build(DayTwoScene.ScenePath, "Warehouse-Weight.apk", ApplicationId + ".weight", "Warehouse VR Weight");
         }
 
+        [MenuItem("Warehouse/Build Pilot APK")]
+        public static void BuildPilot()
+        {
+            DayTwoScene.EnsureScene();
+            Build(DayTwoScene.ScenePath, "Warehouse-Pilot.apk", ApplicationId + ".pilot", "Warehouse VR Pilot");
+        }
+
         static void ConfigurePlayer()
         {
             PlayerSettings.productName = "Warehouse VR";

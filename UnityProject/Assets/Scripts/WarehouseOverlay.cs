@@ -17,6 +17,7 @@ namespace Warehouse
         const float ButtonHeight = 48f;
         const float ButtonRight = 290f;
 
+        readonly Image blackout;
         readonly RectTransform panel;
         readonly RectTransform card;
         readonly Image hintButton;
@@ -39,6 +40,10 @@ namespace Warehouse
             panel.localScale = Vector3.one * 0.0012f;
 
             overlay = new Material(Resources.Load<Shader>("WarehouseHintOverlay"));
+            var curtain = CreateCanvas("Vent Transition", camera, camera.transform, Vector2.one * 4f, 100);
+            curtain.localPosition = Vector3.forward * 0.2f;
+            blackout = AddImage("Blackout", curtain, curtain.sizeDelta, Vector2.zero, Color.black);
+            Fade(0f);
             var font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
             card = AddImage("Hint Card", panel, CardSize, Vector2.zero,
                 new Color(0.06f, 0.11f, 0.15f, 0.97f)).rectTransform;
@@ -80,7 +85,13 @@ namespace Warehouse
 
         public void ShowMode(string mode) => modeLabel.text = mode + " · A";
 
-        public void Place(Transform camera, Transform leftController)
+        public void Fade(float alpha)
+        {
+            blackout.enabled = alpha > 0f;
+            blackout.color = new Color(0f, 0f, 0f, alpha);
+        }
+
+        public void Place(Transform camera, Transform leftController, float playerScale)
         {
             Vector3 forward = camera.forward;
             Vector3 flatForward = Vector3.ProjectOnPlane(forward, Vector3.up);
@@ -90,16 +101,18 @@ namespace Warehouse
             float pitch = Mathf.Atan2(-forward.y, flatForward.magnitude) * Mathf.Rad2Deg;
             Quaternion rotation = Quaternion.LookRotation(heading, Vector3.up) *
                 Quaternion.Euler(Mathf.Clamp(pitch, -65f, 65f), 0f, 0f);
-            panel.SetPositionAndRotation(camera.position + rotation * offset, rotation);
+            panel.SetPositionAndRotation(camera.position + rotation * (offset * playerScale), rotation);
+
+            panel.localScale = Vector3.one * (0.0012f * playerScale);
 
             Vector3 modePosition = leftController.TransformPoint(WristOffset);
             Vector3 eyeToMode = modePosition - camera.position;
-            bool modeVisible = showMode && Vector3.Dot(eyeToMode, forward) > 0.22f;
+            bool modeVisible = showMode && Vector3.Dot(eyeToMode, forward) > 0.22f * playerScale;
             modePanel.gameObject.SetActive(modeVisible);
             if (modeVisible)
             {
                 modePanel.SetPositionAndRotation(modePosition, Quaternion.LookRotation(eyeToMode, camera.up));
-                modePanel.localScale = Vector3.one * (0.0009f * Mathf.Min(eyeToMode.magnitude, 0.85f));
+                modePanel.localScale = Vector3.one * (0.0009f * Mathf.Min(eyeToMode.magnitude, 0.85f * playerScale));
             }
         }
 

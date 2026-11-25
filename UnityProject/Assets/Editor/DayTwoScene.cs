@@ -106,10 +106,13 @@ namespace Warehouse.Editor
             CreateBlock("Shelf", new Vector3(-1.6f, PlatformHeight - 0.12f, 1.5f),
                 new Vector3(2.2f, 0.24f, 2f), steel);
             route.shelfArrival = new GameObject("Shelf Arrival").transform;
-            route.shelfArrival.SetPositionAndRotation(new Vector3(-1.1f, PlatformHeight + 0.01f, 1f),
+            route.shelfArrival.SetPositionAndRotation(new Vector3(-0.75f, PlatformHeight + 0.01f, 1f),
                 Quaternion.Euler(0f, 103f, 0f));
             route.box = CreateBlock("Lift Box", new Vector3(1.25f, 0.36f, 0.45f),
                 Vector3.one * 0.72f, target).GetComponent<Collider>();
+            var boxBody = route.box.gameObject.AddComponent<Rigidbody>();
+            boxBody.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
+            boxBody.interpolation = RigidbodyInterpolation.Interpolate;
             Sign("Box Sign", "BOX\nRIGHT TRIGGER", new Vector3(1.25f, 0.92f, 0.45f), 103f);
 
             var dock = new Vector3(1.25f, 1.66f, 0.45f);

@@ -290,7 +290,8 @@ namespace Warehouse.Editor
                 Marker("Weight", route.weight, 0.25f, 0f, "Подбери массу гири", settings, eyes, arrow, outline),
                 Marker("Vent", route.vent, 0.2f, 0f, "Вентиляция", settings, eyes, arrow, outline),
                 Marker("Box", route.box, 0.1f, 0.6f, "Ящик — в паз", settings, eyes, arrow, outline),
-                Marker("Exit", route.exitZone, 0.35f, 0f, "Выход", settings, eyes, arrow, outline));
+                Marker("Exit", route.exitZone, 0.35f, 0f, "Выход", settings, eyes, arrow, outline),
+                GameObject.Find("Exit Door").GetComponent<Collider>());
         }
 
         static ObjectiveMarker Marker(string name, Collider target, float lift, float shift, string text, MarkerSettings settings,

@@ -44,6 +44,8 @@ namespace Warehouse
         [SerializeField] private ObjectiveMarker ventMarker;
         [SerializeField] private ObjectiveMarker boxMarker;
         [SerializeField] private ObjectiveMarker exitMarker;
+        [Tooltip("Aiming at this collider shows the exit marker.")]
+        [SerializeField] private Collider exitDoor;
 
         const float AimRange = 7f;
         const float PlayerClearance = 0.3f;
@@ -61,6 +63,7 @@ namespace Warehouse
         bool restarting;
         float aimWidth;
         bool wasAiming;
+        Collider aimed;
 
         Vector3 PlayerFloor => scaler.Floor;
 
@@ -74,8 +77,9 @@ namespace Warehouse
         public void ConfigureUndo(UndoHistory value) => history = value;
 
         public void ConfigureMarkers(ObjectiveMarker weightTarget, ObjectiveMarker ventTarget,
-            ObjectiveMarker boxTarget, ObjectiveMarker exitTarget)
+            ObjectiveMarker boxTarget, ObjectiveMarker exitTarget, Collider door)
         {
+            exitDoor = door;
             weightMarker = weightTarget;
             ventMarker = ventTarget;
             boxMarker = boxTarget;
@@ -200,15 +204,15 @@ namespace Warehouse
             UpdateMarkers();
         }
 
-        // Only the current goal is marked, and only while hints are shown.
+        // The current goal's marker appears while the right ray points at that object and hints are shown.
         void UpdateMarkers()
         {
             bool hints = overlay.HintsVisible && !restarting;
             bool normal = scaler.IsNormalSize;
-            weightMarker.SetVisible(hints && stage == Stage.Weight);
-            ventMarker.SetVisible(hints && stage == Stage.Vent);
-            boxMarker.SetVisible(hints && stage == Stage.Box && normal);
-            exitMarker.SetVisible(hints && stage == Stage.Balcony && normal);
+            weightMarker.SetVisible(hints && stage == Stage.Weight && aimed == weight);
+            ventMarker.SetVisible(hints && stage == Stage.Vent && aimed == vent);
+            boxMarker.SetVisible(hints && stage == Stage.Box && normal && aimed == box);
+            exitMarker.SetVisible(hints && stage == Stage.Balcony && normal && aimed == exitDoor);
         }
 
         // Called before and after the frame's actions, so B never lands in the middle of a transition.
@@ -246,6 +250,7 @@ namespace Warehouse
             var ray = new Ray(origin, direction);
             bool hitScene = Physics.Raycast(ray, out RaycastHit result, AimRange,
                 Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore);
+            aimed = overlayHit == WarehouseOverlay.Hit.None && hitScene ? result.collider : null;
             float selfDistance = 0f;
             bool onSelf = overlayHit == WarehouseOverlay.Hit.None && selfAvailable &&
                 scaler.RayHitsSelf(ray, out selfDistance) && selfDistance <= AimRange &&

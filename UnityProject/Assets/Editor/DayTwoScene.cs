@@ -99,9 +99,9 @@ namespace Warehouse.Editor
                 route.player.Camera);
             route.ConfigureUndo(history);
 
-            var floor = Material("Floor", new Color(0.35f, 0.39f, 0.42f));
-            var wall = Material("Wall", new Color(0.26f, 0.32f, 0.37f));
-            var steel = Material("Platform", new Color(0.35f, 0.51f, 0.64f));
+            var floor = LabDecor.Paint("Floor", LabDecor.FloorColor);
+            var wall = LabDecor.Paint("Wall", LabDecor.WallColor);
+            var steel = LabDecor.Paint("Platform", LabDecor.PlatformColor);
             var target = Material("Target", new Color(0.94f, 0.57f, 0.18f));
             var pad = Material("Teleport Pad", new Color(0.10f, 0.67f, 0.54f));
             var scaler = rig.AddComponent<PlayerScaler>();
@@ -122,7 +122,7 @@ namespace Warehouse.Editor
                 new Vector3(0.8f, 0.11f, 0.75f), steel);
             route.weight = CreateBlock("Weight", new Vector3(-3.85f, 0.34f, -0.38f),
                 new Vector3(0.51f, 0.46f, 0.51f), target).GetComponent<Collider>();
-            var weightSign = Sign("Weight Sign", "WEIGHT\nRIGHT TRIGGER", new Vector3(-3.85f, 0.69f, -0.64f));
+            var weightSign = Sign("Weight Sign", "ГИРЯ\nКУРОК", new Vector3(-3.85f, 1.0f, -0.64f));
             ConfigureWeightPuzzle(route, plate, weightSign);
 
             route.vent = CreateBlock("Vent Recess", new Vector3(-3.85f, 0.44f, 2.72f),
@@ -140,7 +140,7 @@ namespace Warehouse.Editor
                 CreateBlock("Grate Bar", new Vector3(index * 0.18f, 0f, 0f),
                     new Vector3(0.08f, 0.77f, 0.1f), steel, route.grate.transform);
             }
-            Sign("Vent Sign", "VENT\nRIGHT TRIGGER", new Vector3(-3.85f, 1.18f, 2.13f));
+            Sign("Vent Sign", "ВЕНТИЛЯЦИЯ\nкурок по проёму", new Vector3(-3.85f, 1.18f, 2.13f));
 
             CreateBlock("Shelf", new Vector3(-1.6f, PlatformHeight - 0.12f, 1.5f),
                 new Vector3(2.2f, 0.24f, 2f), steel);
@@ -168,7 +168,10 @@ namespace Warehouse.Editor
                 new Vector3(1.72f, 0.38f, 1.12f));
             CreateBlock("Exit Door", new Vector3(4.02f, PlatformHeight + 0.98f, 2.47f),
                 new Vector3(1.25f, 1.96f, 0.16f), wall);
-            route.exitSign = Sign("Exit Sign", "EXIT", new Vector3(4.02f, 3.82f, 2.35f));
+            route.exitSign = Sign("Exit Sign", "ВЫХОД", new Vector3(4.02f, 3.82f, 2.35f));
+
+            LabDecor.Build(route);
+            LabDecor.MarkStatic(scene, GameObject.Find("Pressure Button"));
 
             if (!EditorSceneManager.SaveScene(scene, ScenePath, saveAsCopy: true))
                 throw new InvalidOperationException("Could not save " + ScenePath);
@@ -197,9 +200,11 @@ namespace Warehouse.Editor
             scalable.IgnoreForRoomCheck(plate.GetComponent<Collider>(), button.GetComponent<Collider>());
 
             var settings = LoadOrCreate<PressurePlateSettings>(PlateSettingsPath);
-            var readout = Sign("Weight Readout", "", weightSign.transform.position + Vector3.up * 0.39f);
+            var readout = Sign("Weight Readout", "", weightSign.transform.position + Vector3.up * 0.33f);
+            // Two long lines: smaller letters keep them inside the board.
+            readout.characterSize = 0.019f;
             route.pressurePlate.ConfigureReadout(settings, readout, scalable);
-            weightSign.text = "SIZE -10% TRIGGER\n+10% STICK UP";
+            weightSign.text = "курок: -10 %\nстик вверх: +10 %";
 
             // Green mark beside the button: its top edge stops inside the mark when the mass is in the window.
             float buttonTop = button.transform.position.y + button.transform.localScale.y * 0.5f;

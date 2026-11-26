@@ -172,7 +172,7 @@ namespace Warehouse
                     if (scaler.IsNormalSize && exitZone.bounds.Contains(PlayerFloor))
                     {
                         balconyPad.enabled = false;
-                        exitSign.text = "COMPLETE";
+                        exitSign.text = "ГОТОВО";
                         exitSign.color = new Color(0.4f, 1f, 0.7f);
                         feedback.Succeeded(player.Camera.transform.position + player.Camera.transform.forward);
                         SetStage(Stage.Complete);
@@ -353,7 +353,7 @@ namespace Warehouse
                     ("Подними ящик", "Нажми A для режима «Гравитация». Наведи луч на ящик и нажми курок."),
                 Stage.Box => ("Подними ящик в паз",
                     $"Курок по ящику меняет его гравитацию. Сейчас: {boxGravity.Current.label}. Найди ту, что тянет вверх."),
-                _ => ("Доберись до выхода", "Левым стиком телепортируйся на балкон к двери с надписью EXIT."),
+                _ => ("Доберись до выхода", "Левым стиком телепортируйся на балкон к двери с надписью «ВЫХОД»."),
             };
             overlay.Show(title, instructions);
         }

@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using TMPro;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.Rendering;
@@ -21,6 +22,10 @@ namespace Warehouse.Editor
         public static readonly Color FloorColor = new(0.80f, 0.77f, 0.69f);
         public static readonly Color WallColor = new(0.93f, 0.89f, 0.78f);
         public static readonly Color PlatformColor = new(0.45f, 0.49f, 0.33f);
+
+        /// <summary>Centre and tilt of the scale console face that carries the mass readout.</summary>
+        public static readonly Vector3 ConsoleFace = new(-3.85f, 0.43f, -0.97f);
+        public const float ConsoleTilt = 38f;
 
         public static void Build(WarehouseRoute route)
         {
@@ -54,7 +59,7 @@ namespace Warehouse.Editor
         static void MarkStatic(Transform node, HashSet<GameObject> skip)
         {
             GameObject go = node.gameObject;
-            if (skip.Contains(go) || go.GetComponent<TextMesh>() != null || go.GetComponent<Canvas>() != null ||
+            if (skip.Contains(go) || go.GetComponent<TMP_Text>() != null || go.GetComponent<ObjectiveMarker>() != null || go.GetComponent<Canvas>() != null ||
                 go.GetComponent<Unity.XR.CoreUtils.XROrigin>() != null || go.GetComponent<Rigidbody>() != null)
                 return;
 
@@ -260,8 +265,9 @@ namespace Warehouse.Editor
             var center = new Vector3(-1.6f, 2.65f, 2.9f);
             Block("Board Frame", center + Vector3.forward * 0.01f, new Vector3(2.1f, 1.2f, 0.02f), wood, parent);
             Block("Board", center, new Vector3(2f, 1.1f, 0.02f), chalkboard, parent);
-            Label("Board Text", "m = m0 · k³\nF = m · g\ng Луны = 1,62 м/с²",
-                center + new Vector3(-0.85f, 0.4f, -0.02f), 0.032f, new Color(0.93f, 0.95f, 0.9f), TextAnchor.UpperLeft, parent);
+            var chalk = LabText.Create("Board Text", "m = m₀ · k³\nF = m · g\ng Луны = 1,62 м/с²",
+                center + Vector3.back * 0.015f, 1.6f, new Color(0.93f, 0.95f, 0.9f), parent, TextAlignmentOptions.Left);
+            chalk.rectTransform.sizeDelta = new Vector2(1.75f, 0.95f);
         }
 
         static void Clock()
@@ -347,16 +353,16 @@ namespace Warehouse.Editor
             Block("Exit Sign Back", new Vector3(4.02f, 3.82f, 2.39f), new Vector3(0.62f, 0.24f, 0.03f), signBack, parent);
         }
 
-        // Dark enamel boards behind the white labels, so they do not melt into the cream walls and tiles.
+        // Scale console in front of the plate; its tilted dark face carries the mass readout.
         static void SignBoards()
         {
-            var parent = Group("Sign Boards");
-            // Weight hint and mass readout: one board on a post above the weight.
-            // The hint sits at y 1.0 and the mass readout 0.33 above it (see DayTwoScene).
-            Block("Weight Board", new Vector3(-3.85f, 1.17f, -0.62f), new Vector3(1.15f, 0.62f, 0.02f), signBoard, parent);
-            Block("Weight Board Frame", new Vector3(-3.85f, 1.17f, -0.61f), new Vector3(1.19f, 0.66f, 0.01f), iron, parent);
-            Block("Weight Board Post", new Vector3(-3.24f, 0.74f, -0.61f), new Vector3(0.04f, 1.48f, 0.04f), iron, parent);
-            Block("Vent Sign Board", new Vector3(-3.85f, 1.18f, 2.15f), new Vector3(1.15f, 0.4f, 0.02f), signBoard, parent);
+            var parent = Group("Scale Console");
+            var tilt = Quaternion.Euler(ConsoleTilt, 0f, 0f);
+            Block("Console Body", new Vector3(ConsoleFace.x, 0.17f, ConsoleFace.z + 0.03f), new Vector3(0.92f, 0.34f, 0.2f), iron, parent);
+            var face = Block("Console Face", ConsoleFace, new Vector3(0.92f, 0.3f, 0.02f), signBoard, parent);
+            face.transform.localRotation = tilt;
+            var rim = Block("Console Rim", ConsoleFace + tilt * Vector3.forward * 0.012f, new Vector3(0.96f, 0.34f, 0.01f), trim, parent);
+            rim.transform.localRotation = tilt;
         }
 
         // The rod that holds the dock becomes an iron pipe with a flange at the ceiling.
@@ -420,21 +426,6 @@ namespace Warehouse.Editor
             renderer.sharedMaterial = material;
             renderer.shadowCastingMode = ShadowCastingMode.Off;
             return shape;
-        }
-
-        static void Label(string name, string text, Vector3 position, float size, Color color, TextAnchor anchor, Transform parent)
-        {
-            var label = new GameObject(name).AddComponent<TextMesh>();
-            label.transform.SetParent(parent, false);
-            label.transform.position = position;
-            label.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            label.GetComponent<MeshRenderer>().sharedMaterial = label.font.material;
-            label.anchor = anchor;
-            label.alignment = TextAlignment.Left;
-            label.fontSize = 48;
-            label.characterSize = size;
-            label.text = text;
-            label.color = color;
         }
     }
 }

@@ -1,3 +1,4 @@
+using TMPro;
 using Unity.XR.CoreUtils;
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -29,7 +30,7 @@ namespace Warehouse
         public Collider box;
         public TeleportationArea balconyPad;
         public BoxCollider exitZone;
-        public TextMesh exitSign;
+        public TMP_Text exitSign;
 
         [Header("Remote effects")]
         [SerializeField] private PlayerScaler scaler;
@@ -37,6 +38,12 @@ namespace Warehouse
         [SerializeField] private GravitySocket boxSocket;
         [SerializeField] private RemoteFeedback feedback;
         [SerializeField] private UndoHistory history;
+
+        [Header("Objective markers")]
+        [SerializeField] private ObjectiveMarker weightMarker;
+        [SerializeField] private ObjectiveMarker ventMarker;
+        [SerializeField] private ObjectiveMarker boxMarker;
+        [SerializeField] private ObjectiveMarker exitMarker;
 
         const float AimRange = 7f;
         const float PlayerClearance = 0.3f;
@@ -65,6 +72,15 @@ namespace Warehouse
         public void ConfigureFeedback(RemoteFeedback value) => feedback = value;
 
         public void ConfigureUndo(UndoHistory value) => history = value;
+
+        public void ConfigureMarkers(ObjectiveMarker weightTarget, ObjectiveMarker ventTarget,
+            ObjectiveMarker boxTarget, ObjectiveMarker exitTarget)
+        {
+            weightMarker = weightTarget;
+            ventMarker = ventTarget;
+            boxMarker = boxTarget;
+            exitMarker = exitTarget;
+        }
 
         public void ConfigureBox(GravityBody gravity, GravitySocket socket)
         {
@@ -181,6 +197,18 @@ namespace Warehouse
                     break;
             }
             UpdateUndoBlock();
+            UpdateMarkers();
+        }
+
+        // Only the current goal is marked, and only while hints are shown.
+        void UpdateMarkers()
+        {
+            bool hints = overlay.HintsVisible && !restarting;
+            bool normal = scaler.IsNormalSize;
+            weightMarker.SetVisible(hints && stage == Stage.Weight);
+            ventMarker.SetVisible(hints && stage == Stage.Vent);
+            boxMarker.SetVisible(hints && stage == Stage.Box && normal);
+            exitMarker.SetVisible(hints && stage == Stage.Balcony && normal);
         }
 
         // Called before and after the frame's actions, so B never lands in the middle of a transition.

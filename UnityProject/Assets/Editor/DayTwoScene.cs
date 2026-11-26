@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Linq;
+using TMPro;
 using Unity.XR.CoreUtils;
 using UnityEditor;
 using UnityEditor.SceneManagement;
@@ -23,6 +24,7 @@ namespace Warehouse.Editor
         const string PlateSettingsPath = Folder + "/PressurePlateSettings.asset";
         const string ScaleStepSettingsPath = Folder + "/ScaleStepSettings.asset";
         const string UndoSettingsPath = Folder + "/UndoSettings.asset";
+        const string MarkerSettingsPath = Folder + "/MarkerSettings.asset";
         const float BoxYaw = 103f;
         const float BoxMass = 20f;
         const float PlatformHeight = 1.65f;
@@ -55,6 +57,9 @@ namespace Warehouse.Editor
                 return;
 
             EnsureScenes();
+            LabText.ImportEssentials();
+            if (!AssetDatabase.IsValidFolder("Assets/TextMesh Pro"))
+                throw new InvalidOperationException("Run Warehouse > Import Text Resources first.");
             if (!AssetDatabase.IsValidFolder(Folder))
                 AssetDatabase.CreateFolder("Assets", "Day2");
 
@@ -122,8 +127,7 @@ namespace Warehouse.Editor
                 new Vector3(0.8f, 0.11f, 0.75f), steel);
             route.weight = CreateBlock("Weight", new Vector3(-3.85f, 0.34f, -0.38f),
                 new Vector3(0.51f, 0.46f, 0.51f), target).GetComponent<Collider>();
-            var weightSign = Sign("Weight Sign", "ГИРЯ\nКУРОК", new Vector3(-3.85f, 1.0f, -0.64f));
-            ConfigureWeightPuzzle(route, plate, weightSign);
+            ConfigureWeightPuzzle(route, plate);
 
             route.vent = CreateBlock("Vent Recess", new Vector3(-3.85f, 0.44f, 2.72f),
                 new Vector3(0.86f, 0.78f, 0.10f), steel).GetComponent<Collider>();
@@ -140,7 +144,6 @@ namespace Warehouse.Editor
                 CreateBlock("Grate Bar", new Vector3(index * 0.18f, 0f, 0f),
                     new Vector3(0.08f, 0.77f, 0.1f), steel, route.grate.transform);
             }
-            Sign("Vent Sign", "ВЕНТИЛЯЦИЯ\nкурок по проёму", new Vector3(-3.85f, 1.18f, 2.13f));
 
             CreateBlock("Shelf", new Vector3(-1.6f, PlatformHeight - 0.12f, 1.5f),
                 new Vector3(2.2f, 0.24f, 2f), steel);
@@ -171,6 +174,7 @@ namespace Warehouse.Editor
             route.exitSign = Sign("Exit Sign", "ВЫХОД", new Vector3(4.02f, 3.82f, 2.35f));
 
             LabDecor.Build(route);
+            CreateMarkers(route);
             LabDecor.MarkStatic(scene, GameObject.Find("Pressure Button"));
 
             if (!EditorSceneManager.SaveScene(scene, ScenePath, saveAsCopy: true))
@@ -180,7 +184,7 @@ namespace Warehouse.Editor
             EditorSceneManager.OpenScene(ScenePath);
         }
 
-        internal static void ConfigureWeightPuzzle(WarehouseRoute route, GameObject plate, TextMesh weightSign)
+        internal static void ConfigureWeightPuzzle(WarehouseRoute route, GameObject plate)
         {
             Vector3 center = plate.transform.position;
             plate.transform.position = center - Vector3.up * 0.03f;
@@ -200,11 +204,12 @@ namespace Warehouse.Editor
             scalable.IgnoreForRoomCheck(plate.GetComponent<Collider>(), button.GetComponent<Collider>());
 
             var settings = LoadOrCreate<PressurePlateSettings>(PlateSettingsPath);
-            var readout = Sign("Weight Readout", "", weightSign.transform.position + Vector3.up * 0.33f);
-            // Two long lines: smaller letters keep them inside the board.
-            readout.characterSize = 0.019f;
+            // Mass readout on the tilted face of the scale console in front of the plate (see LabDecor).
+            Quaternion consoleFace = Quaternion.Euler(LabDecor.ConsoleTilt, 0f, 0f);
+            var readout = LabText.Create("Weight Readout", "", LabDecor.ConsoleFace + consoleFace * Vector3.back * 0.012f,
+                0.62f, Color.white);
+            readout.transform.rotation = consoleFace;
             route.pressurePlate.ConfigureReadout(settings, readout, scalable);
-            weightSign.text = "курок: -10 %\nстик вверх: +10 %";
 
             // Green mark beside the button: its top edge stops inside the mark when the mass is in the window.
             float buttonTop = button.transform.position.y + button.transform.localScale.y * 0.5f;
@@ -269,19 +274,57 @@ namespace Warehouse.Editor
             return zone;
         }
 
-        static TextMesh Sign(string name, string label, Vector3 position, float yaw = 0f)
+        static TextMeshPro Sign(string name, string label, Vector3 position, float yaw = 0f)
         {
-            var text = new GameObject(name).AddComponent<TextMesh>();
-            text.transform.SetPositionAndRotation(position, Quaternion.Euler(0f, yaw, 0f));
-            text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            text.GetComponent<MeshRenderer>().sharedMaterial = text.font.material;
-            text.anchor = TextAnchor.MiddleCenter;
-            text.alignment = TextAlignment.Center;
-            text.fontSize = 48;
-            text.characterSize = 0.028f;
-            text.text = label;
-            text.color = new Color(0.96f, 0.95f, 0.88f);
-            return text;
+            return LabText.Create(name, label, position, 1.3f, new Color(0.96f, 0.95f, 0.88f), yaw: yaw);
+        }
+
+        // One "go here" marker per goal; WarehouseRoute shows the one for the current stage.
+        static void CreateMarkers(WarehouseRoute route)
+        {
+            var settings = LoadOrCreate<MarkerSettings>(MarkerSettingsPath);
+            var arrow = LabDecor.Paint("Marker Arrow", settings.ArrowColor, "Unlit/Color");
+            var outline = LabDecor.Paint("Marker Outline", new Color(0.08f, 0.09f, 0.11f), "Unlit/Color");
+            Transform eyes = route.player.Camera.transform;
+            route.ConfigureMarkers(
+                Marker("Weight", route.weight, 0.25f, 0f, "Подбери массу гири", settings, eyes, arrow, outline),
+                Marker("Vent", route.vent, 0.2f, 0f, "Вентиляция", settings, eyes, arrow, outline),
+                Marker("Box", route.box, 0.1f, 0.6f, "Ящик — в паз", settings, eyes, arrow, outline),
+                Marker("Exit", route.exitZone, 0.35f, 0f, "Выход", settings, eyes, arrow, outline));
+        }
+
+        static ObjectiveMarker Marker(string name, Collider target, float lift, float shift, string text, MarkerSettings settings,
+            Transform eyes, Material arrow, Material outline)
+        {
+            var root = new GameObject(name + " Marker").transform;
+            var chevron = new GameObject("Arrow").transform;
+            chevron.SetParent(root, false);
+            Chevron(chevron, arrow, 0f, 0f);
+            Chevron(chevron, outline, 0.09f, 0.03f);
+            var label = LabText.Create("Label", text, Vector3.zero, 3.2f, settings.LabelColor, root,
+                TextAlignmentOptions.Center);
+            label.transform.localPosition = new Vector3(0f, 0.85f, 0f);
+            label.rectTransform.sizeDelta = new Vector2(12f, 1f);
+            var marker = root.gameObject.AddComponent<ObjectiveMarker>();
+            marker.Configure(settings, target, lift, shift, eyes, chevron, label);
+            return marker;
+        }
+
+        // A downward chevron with its tip at the origin, in marker-size units; +Z is away from the player.
+        static void Chevron(Transform parent, Material material, float grow, float depth)
+        {
+            const float length = 0.55f;
+            const float thickness = 0.14f;
+            const float angle = 42f;
+            foreach (float side in new[] { -1f, 1f })
+            {
+                var direction = new Vector3(side * Mathf.Sin(angle * Mathf.Deg2Rad), Mathf.Cos(angle * Mathf.Deg2Rad), 0f);
+                var bar = CreateBlock("Chevron Bar", direction * (length * 0.5f) + Vector3.forward * depth,
+                    new Vector3(thickness + grow, length + grow, 0.02f), material, parent);
+                bar.transform.localRotation = Quaternion.Euler(0f, 0f, -side * angle);
+                UnityEngine.Object.DestroyImmediate(bar.GetComponent<Collider>());
+                bar.GetComponent<MeshRenderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            }
         }
     }
 }

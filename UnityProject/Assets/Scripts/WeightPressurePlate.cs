@@ -1,4 +1,5 @@
 using System.Globalization;
+using TMPro;
 using UnityEngine;
 
 namespace Warehouse
@@ -12,7 +13,7 @@ namespace Warehouse
         [SerializeField] Rigidbody weight;
         [SerializeField] Transform button;
         [SerializeField] private PressurePlateSettings settings;
-        [SerializeField] private TextMesh readout;
+        [SerializeField] private TMP_Text readout;
         [SerializeField] private ScalableBody scalable;
 
         static readonly int ColorProperty = Shader.PropertyToID("_Color");
@@ -55,7 +56,7 @@ namespace Warehouse
             button = plunger;
         }
 
-        public void ConfigureReadout(PressurePlateSettings values, TextMesh label, ScalableBody body)
+        public void ConfigureReadout(PressurePlateSettings values, TMP_Text label, ScalableBody body)
         {
             settings = values;
             readout = label;
@@ -131,7 +132,7 @@ namespace Warehouse
                 Load.Light => "слишком легко",
                 _ => "в норме",
             };
-            readout.text = $"Размер {shownK:0} % → {Kilograms(mass)} кг\n" +
+            readout.text = $"Размер {shownK:0} % · масса {Kilograms(mass)} кг\n" +
                 $"нужно {Kilograms(settings.MinMass)}–{Kilograms(settings.MaxMass)} кг · {state}";
             readout.color = load switch
             {

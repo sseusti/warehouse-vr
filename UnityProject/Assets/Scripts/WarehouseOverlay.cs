@@ -137,6 +137,9 @@ namespace Warehouse
             restartButton.color = hit == Hit.Restart ? HoverColor : ButtonColor;
         }
 
+        /// <summary>True while the hint card is shown; objective markers follow it.</summary>
+        public bool HintsVisible => card.gameObject.activeSelf;
+
         public void Toggle() => SetVisible(!card.gameObject.activeSelf);
 
         public void ShowCompletion()

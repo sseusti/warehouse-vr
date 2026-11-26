@@ -1,3 +1,4 @@
+using TMPro;
 using UnityEngine;
 
 namespace Warehouse
@@ -12,7 +13,8 @@ namespace Warehouse
         [SerializeField] private GravityPresets presets;
         [Tooltip("Yaw of the label so it faces the player's viewpoint, degrees.")]
         [SerializeField] private float labelYaw;
-        [SerializeField, Min(0f)] private float labelHeight = 0.6f;
+        [Tooltip("Distance from the centre to the label on the face turned to the player, metres.")]
+        [SerializeField, Min(0f)] private float labelDepth = 0.375f;
 
         static readonly int ColorProperty = Shader.PropertyToID("_Color");
         static readonly Color HighlightColor = new(1f, 0.86f, 0.40f);
@@ -20,7 +22,7 @@ namespace Warehouse
         Rigidbody body;
         int presetIndex;
         Vector3 acceleration;
-        TextMesh label;
+        TextMeshPro label;
         Renderer surface;
         MaterialPropertyBlock properties;
         bool highlighted;
@@ -97,9 +99,12 @@ namespace Warehouse
                 body.AddForce(acceleration, ForceMode.Acceleration);
         }
 
+        // Stencilled on the face of the body that looks at the player.
+        Vector3 LabelPosition => transform.position + label.transform.rotation * Vector3.back * labelDepth;
+
         void LateUpdate()
         {
-            label.transform.position = transform.position + Vector3.up * labelHeight;
+            label.transform.position = LabelPosition;
         }
 
         void Apply(int index)
@@ -110,23 +115,21 @@ namespace Warehouse
             body.WakeUp();
 
             float weight = body.mass * preset.acceleration;
-            string direction = preset.upward ? " ↑" : "";
-            label.text = $"{preset.label}{direction}\n{preset.acceleration:0.##} м/с² · вес {weight:0} Н";
+            label.text = $"{preset.label}\n{preset.acceleration:0.##} м/с²\nвес {weight:0} Н";
             Debug.Log($"Warehouse {name} gravity {preset.label} {acceleration}.");
         }
 
         void CreateLabel()
         {
-            label = new GameObject(name + " Gravity Label").AddComponent<TextMesh>();
-            label.transform.SetPositionAndRotation(transform.position + Vector3.up * labelHeight,
-                Quaternion.Euler(0f, labelYaw, 0f));
-            label.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            label.GetComponent<MeshRenderer>().sharedMaterial = label.font.material;
-            label.anchor = TextAnchor.MiddleCenter;
-            label.alignment = TextAlignment.Center;
-            label.fontSize = 48;
-            label.characterSize = 0.028f;
-            label.color = new Color(0.96f, 0.95f, 0.88f);
+            // TextMeshPro picks the project default font (Noto Sans with Cyrillic and an outline).
+            label = new GameObject(name + " Gravity Label").AddComponent<TextMeshPro>();
+            label.transform.rotation = Quaternion.Euler(0f, labelYaw, 0f);
+            label.transform.position = LabelPosition;
+            label.alignment = TextAlignmentOptions.Center;
+            label.textWrappingMode = TextWrappingModes.NoWrap;
+            label.rectTransform.sizeDelta = new Vector2(3f, 1f);
+            label.fontSize = 0.95f;
+            label.color = new Color(1f, 0.97f, 0.88f);
         }
     }
 }

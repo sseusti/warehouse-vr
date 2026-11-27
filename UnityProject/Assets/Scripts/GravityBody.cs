@@ -77,7 +77,8 @@ namespace Warehouse
             body.isKinematic = true;
             body.position = position;
             transform.position = position;
-            label.text = "Зафиксирован";
+            // Short enough for the box face.
+            label.text = "В пазу";
             Debug.Log($"Warehouse {name} locked at {position}.");
         }
 

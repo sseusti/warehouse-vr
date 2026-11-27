@@ -19,7 +19,6 @@ namespace Warehouse
 
         [Header("Ground floor")]
         public Collider weight;
-        public WeightPressurePlate pressurePlate;
         public GameObject grate;
         public Collider vent;
         public TeleportationArea startPad;
@@ -38,6 +37,7 @@ namespace Warehouse
         [SerializeField] private GravitySocket boxSocket;
         [SerializeField] private RemoteFeedback feedback;
         [SerializeField] private UndoHistory history;
+        [SerializeField] private BalanceScale balance;
 
         [Header("Objective markers")]
         [SerializeField] private ObjectiveMarker weightMarker;
@@ -68,13 +68,15 @@ namespace Warehouse
         Vector3 PlayerFloor => scaler.Floor;
 
         bool SelfTargetAvailable => mode == RemoteMode.Size && !scaler.IsChanging &&
-            stage is Stage.Vent or Stage.Box or Stage.Balcony;
+            stage is Stage.Weight or Stage.Vent or Stage.Box or Stage.Balcony;
 
         public void ConfigureScaler(PlayerScaler value) => scaler = value;
 
         public void ConfigureFeedback(RemoteFeedback value) => feedback = value;
 
         public void ConfigureUndo(UndoHistory value) => history = value;
+
+        public void ConfigureBalance(BalanceScale value) => balance = value;
 
         public void ConfigureMarkers(ObjectiveMarker weightTarget, ObjectiveMarker ventTarget,
             ObjectiveMarker boxTarget, ObjectiveMarker exitTarget, Collider door)
@@ -113,6 +115,7 @@ namespace Warehouse
         {
             scaler.Changed += RefreshHint;
             history.Changed += RefreshUndoHint;
+            balance.Changed += RefreshHint;
             overlay.EnableShortcut();
             switchMode.Enable();
             grow.Enable();
@@ -122,6 +125,7 @@ namespace Warehouse
         {
             scaler.Changed -= RefreshHint;
             history.Changed -= RefreshUndoHint;
+            balance.Changed -= RefreshHint;
             overlay.DisableShortcut();
             switchMode.Disable();
             grow.Disable();
@@ -165,13 +169,17 @@ namespace Warehouse
             switch (stage)
             {
                 case Stage.Weight:
-                    if (pressurePlate.IsUnlocked)
+                    // The balance lifted the player up to the grate.
+                    if (balance.RiderRaised)
                     {
-                        grate.SetActive(false);
                         feedback.Succeeded(grate.transform.position);
                         SetStage(Stage.Vent);
-                        Debug.Log("Warehouse pressure plate released.");
+                        Debug.Log($"Warehouse balance raised the player: load {balance.LoadMass:0.###} kg, player {balance.RiderMass:0.###} kg.");
                     }
+                    break;
+                case Stage.Vent:
+                    if (!balance.RiderRaised)
+                        SetStage(Stage.Weight);
                     break;
                 case Stage.Arriving:
                     if (Mathf.Abs(PlayerFloor.y - shelfArrival.position.y) < 0.05f)
@@ -208,11 +216,10 @@ namespace Warehouse
         void UpdateMarkers()
         {
             bool hints = overlay.HintsVisible && !restarting;
-            bool normal = scaler.IsNormalSize;
             weightMarker.SetVisible(hints && stage == Stage.Weight && aimed == weight);
             ventMarker.SetVisible(hints && stage == Stage.Vent && aimed == vent);
-            boxMarker.SetVisible(hints && stage == Stage.Box && normal && aimed == box);
-            exitMarker.SetVisible(hints && stage == Stage.Balcony && normal && aimed == exitDoor);
+            boxMarker.SetVisible(hints && stage == Stage.Box && aimed == box);
+            exitMarker.SetVisible(hints && stage == Stage.Balcony && aimed == exitDoor);
         }
 
         // Called before and after the frame's actions, so B never lands in the middle of a transition.
@@ -266,7 +273,7 @@ namespace Warehouse
             bool onCollider = overlayHit == WarehouseOverlay.Hit.None && !onSelf && hitScene && result.collider == target;
             bool forbidden = onCollider && stage == Stage.Vent && !scaler.FitsVent;
             bool onTarget = onCollider && modeMatches && !forbidden && !scaler.IsChanging;
-            pressurePlate.SetHighlighted(stage == Stage.Weight && onTarget);
+            balance.SetHighlighted(stage == Stage.Weight && onTarget);
             boxGravity.SetHighlighted(stage == Stage.Box && onTarget);
 
             Vector3 end = hitScene ? result.point : origin + direction * AimRange;
@@ -319,7 +326,7 @@ namespace Warehouse
 
         void ResizeWeight(int direction, Vector3 point)
         {
-            ScalableBody body = pressurePlate.Scalable;
+            ScalableBody body = balance.Load;
             float before = body.TargetScale;
             if (!body.TryStep(direction, PlayerFloor, PlayerClearance))
             {
@@ -340,6 +347,7 @@ namespace Warehouse
         {
             startPad.enabled = true;
             ventPad.enabled = true;
+            grate.SetActive(true);
             balconyPad.gameObject.SetActive(false);
             teleport.QueueTeleportRequest(new TeleportRequest
             {
@@ -368,19 +376,22 @@ namespace Warehouse
         {
             var (title, instructions) = stage switch
             {
+                Stage.Weight when !balance.RiderOn =>
+                    ("Встань на чашу весов", "Левым стиком телепортируйся на правую чашу весов у стены, под решёткой."),
                 Stage.Weight when mode != RemoteMode.Size =>
-                    ("Подбери массу гири", "Нажми A для режима «Размер». Затем наведи луч на гирю."),
-                Stage.Weight => ("Подбери массу гири",
-                    "Луч на гирю: курок — меньше на 10 %, правый стик вверх — больше. Весам нужно 1,5–2,5 кг."),
+                    ("Перевесь себя гирей", "Нажми A для режима «Размер»."),
+                Stage.Weight => ("Перевесь себя гирей",
+                    $"Гиря {BalanceScale.Kilograms(balance.LoadMass)} кг, ты {BalanceScale.Kilograms(balance.RiderMass)} кг. " +
+                    "Уменьшись (луч на кольцо под ногами) и увеличь гирю (луч на гирю, стик вверх)."),
                 Stage.Vent when !scaler.FitsVent && mode != RemoteMode.Size =>
                     ("Стань меньше", "Нажми A для режима «Размер». Наведи луч на кольцо у себя под ногами и нажми курок."),
                 Stage.Vent when !scaler.FitsVent =>
-                    ("Стань меньше", "Подойди к решётке. Наведи луч на кольцо у себя под ногами и нажми курок."),
-                Stage.Vent => ("Пройди через вентиляцию", "Подойди к решётке. Наведи правый луч на проём и нажми курок."),
+                    ("Стань меньше", "Наведи луч на кольцо у себя под ногами и нажми курок."),
+                Stage.Vent => ("Пролезь в вентиляцию", "Наведи правый луч на решётку перед собой и нажми курок."),
                 Stage.Arriving => ("Переход на полку", ""),
-                Stage.Box or Stage.Balcony when !scaler.IsNormalSize && mode != RemoteMode.Size =>
+                Stage.Balcony when !scaler.IsNormalSize && mode != RemoteMode.Size =>
                     ("Верни свой размер", "Нажми A для режима «Размер». Наведи луч на кольцо под ногами и нажми курок."),
-                Stage.Box or Stage.Balcony when !scaler.IsNormalSize =>
+                Stage.Balcony when !scaler.IsNormalSize =>
                     ("Верни свой размер", "Наведи луч на кольцо у себя под ногами и нажимай курок, пока не станешь прежним."),
                 Stage.Box when mode != RemoteMode.Gravity =>
                     ("Подними ящик", "Нажми A для режима «Гравитация». Наведи луч на ящик и нажми курок."),
@@ -407,6 +418,8 @@ namespace Warehouse
                         () => ReturnToVent(floor, forward.normalized)));
                     startPad.enabled = false;
                     ventPad.enabled = false;
+                    // The grate swings open and the player crawls through behind the fade.
+                    grate.SetActive(false);
                     teleport.QueueTeleportRequest(new TeleportRequest
                     {
                         destinationPosition = shelfArrival.position,

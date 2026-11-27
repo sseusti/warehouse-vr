@@ -25,6 +25,13 @@ namespace Warehouse.Editor
         const string ScaleStepSettingsPath = Folder + "/ScaleStepSettings.asset";
         const string UndoSettingsPath = Folder + "/UndoSettings.asset";
         const string MarkerSettingsPath = Folder + "/MarkerSettings.asset";
+        const string BalanceSettingsPath = Folder + "/BalanceSettings.asset";
+        // Lever balance against the back wall: load pan on the left, player pan on the right under the vent.
+        static readonly Vector3 BalancePivot = new(-3.85f, 0.65f, 2.45f);
+        static readonly Vector3 LoadPanCenter = new(-4.4f, 0.62f, 2.45f);
+        static readonly Vector3 RiderPanCenter = new(-3.3f, 0.635f, 2.45f);
+        const float WeightSize = 0.2f;
+        const float WeightMass = 0.5f;
         const float BoxYaw = 103f;
         const float BoxMass = 20f;
         const float PlatformHeight = 1.65f;
@@ -121,34 +128,30 @@ namespace Warehouse.Editor
 
             route.startPad = AddPad("Start Pad", new Vector3(-3.85f, 0.015f, -1.75f),
                 new Vector2(1.3f, 1.1f), pad, route.teleport);
-            route.ventPad = AddPad("Vent Approach", new Vector3(-3.85f, 0.015f, 0.8f),
-                new Vector2(1.35f, 1.05f), pad, route.teleport);
-            var plate = CreateBlock("Pressure Plate", new Vector3(-3.85f, 0.055f, -0.38f),
-                new Vector3(0.8f, 0.11f, 0.75f), steel);
-            route.weight = CreateBlock("Weight", new Vector3(-3.85f, 0.34f, -0.38f),
-                new Vector3(0.51f, 0.46f, 0.51f), target).GetComponent<Collider>();
-            ConfigureWeightPuzzle(route, plate);
+            CreateBalance(route, steel, target, pad, scaler);
 
-            route.vent = CreateBlock("Vent Recess", new Vector3(-3.85f, 0.44f, 2.72f),
-                new Vector3(0.86f, 0.78f, 0.10f), steel).GetComponent<Collider>();
-            CreateBlock("Vent Left Frame", new Vector3(-4.37f, 0.45f, 2.45f),
-                new Vector3(0.18f, 0.9f, 0.58f), wall);
-            CreateBlock("Vent Right Frame", new Vector3(-3.33f, 0.45f, 2.45f),
-                new Vector3(0.18f, 0.9f, 0.58f), wall);
-            CreateBlock("Vent Top Frame", new Vector3(-3.85f, 0.88f, 2.45f),
-                new Vector3(1.2f, 0.18f, 0.58f), wall);
+            // Vent high in the back wall, right above the player pan at its top position (1.15 m).
+            route.vent = CreateBlock("Vent Recess", new Vector3(-3.3f, 1.45f, 2.88f),
+                new Vector3(0.62f, 0.5f, 0.06f), steel).GetComponent<Collider>();
+            CreateBlock("Vent Left Frame", new Vector3(-3.66f, 1.45f, 2.86f), new Vector3(0.1f, 0.7f, 0.13f), wall);
+            CreateBlock("Vent Right Frame", new Vector3(-2.94f, 1.45f, 2.86f), new Vector3(0.1f, 0.7f, 0.13f), wall);
+            CreateBlock("Vent Top Frame", new Vector3(-3.3f, 1.75f, 2.86f), new Vector3(0.82f, 0.1f, 0.13f), wall);
+            CreateBlock("Vent Sill", new Vector3(-3.3f, 1.15f, 2.86f), new Vector3(0.82f, 0.1f, 0.13f), wall);
             route.grate = new GameObject("Closed Grate");
-            route.grate.transform.position = new Vector3(-3.85f, 0.43f, 2.16f);
-            for (var index = -2; index <= 2; index++)
+            route.grate.transform.position = new Vector3(-3.3f, 1.45f, 2.81f);
+            for (var index = 0; index < 4; index++)
             {
-                CreateBlock("Grate Bar", new Vector3(index * 0.18f, 0f, 0f),
-                    new Vector3(0.08f, 0.77f, 0.1f), steel, route.grate.transform);
+                // No colliders: the remote ray passes the bars and hits the vent behind them.
+                var bar = CreateBlock("Grate Bar", new Vector3(-0.18f + index * 0.12f, 0f, 0f),
+                    new Vector3(0.05f, 0.48f, 0.04f), steel, route.grate.transform);
+                UnityEngine.Object.DestroyImmediate(bar.GetComponent<Collider>());
             }
 
             CreateBlock("Shelf", new Vector3(-1.6f, PlatformHeight - 0.12f, 1.5f),
                 new Vector3(2.2f, 0.24f, 2f), steel);
             route.shelfArrival = new GameObject("Shelf Arrival").transform;
-            route.shelfArrival.SetPositionAndRotation(new Vector3(-1.1f, PlatformHeight + 0.01f, 1f),
+            // Close to the shelf edge, so even a small player sees the box below.
+            route.shelfArrival.SetPositionAndRotation(new Vector3(-0.8f, PlatformHeight + 0.01f, 0.95f),
                 Quaternion.Euler(0f, 103f, 0f));
             route.box = CreateBlock("Lift Box", new Vector3(1.25f, 0.36f, 0.45f),
                 Vector3.one * 0.72f, target).GetComponent<Collider>();
@@ -184,41 +187,40 @@ namespace Warehouse.Editor
             EditorSceneManager.OpenScene(ScenePath);
         }
 
-        internal static void ConfigureWeightPuzzle(WarehouseRoute route, GameObject plate)
+        static void CreateBalance(WarehouseRoute route, UnityEngine.Material steel, UnityEngine.Material target,
+            UnityEngine.Material pad, PlayerScaler scaler)
         {
-            Vector3 center = plate.transform.position;
-            plate.transform.position = center - Vector3.up * 0.03f;
-            plate.transform.localScale = new Vector3(0.8f, 0.05f, 0.75f);
-            var button = CreateBlock("Pressure Button", center + Vector3.up * 0.025f,
-                new Vector3(0.68f, 0.06f, 0.63f), Material("Pressure Button", new Color(0.20f, 0.65f, 0.82f)));
+            var root = new GameObject("Balance");
+            var pivot = new GameObject("Beam Pivot").transform;
+            pivot.SetParent(root.transform, false);
+            pivot.position = BalancePivot;
+            var beam = CreateBlock("Beam", Vector3.zero, new Vector3(RiderPanCenter.x - LoadPanCenter.x, 0.05f, 0.06f), steel, pivot);
+            UnityEngine.Object.DestroyImmediate(beam.GetComponent<Collider>());
+            CreateBlock("Balance Column", new Vector3(BalancePivot.x, BalancePivot.y * 0.5f, BalancePivot.z),
+                new Vector3(0.1f, BalancePivot.y, 0.1f), steel);
+            CreateBlock("Balance Base", new Vector3(BalancePivot.x, 0.02f, BalancePivot.z), new Vector3(0.4f, 0.04f, 0.3f), steel);
 
-            var weight = route.weight.gameObject.AddComponent<Rigidbody>();
-            weight.mass = 8f;
-            weight.isKinematic = true;
-            weight.useGravity = false;
-            route.pressurePlate = plate.AddComponent<WeightPressurePlate>();
-            route.pressurePlate.Configure(weight, button.transform);
+            var loadPan = CreateBlock("Load Pan", LoadPanCenter, new Vector3(0.6f, 0.06f, 0.6f), steel, root.transform);
+            var riderPan = AddPad("Player Pan", RiderPanCenter, new Vector2(0.8f, 0.8f), pad, route.teleport);
+            riderPan.transform.SetParent(root.transform, true);
+            route.ventPad = riderPan;
 
+            float panTop = LoadPanCenter.y + 0.03f;
+            route.weight = CreateBlock("Weight", new Vector3(LoadPanCenter.x, panTop + WeightSize * 0.5f, LoadPanCenter.z),
+                Vector3.one * WeightSize, target).GetComponent<Collider>();
+            var body = route.weight.gameObject.AddComponent<Rigidbody>();
+            body.mass = WeightMass;
+            body.isKinematic = true;
+            body.useGravity = false;
             var scalable = route.weight.gameObject.AddComponent<ScalableBody>();
             scalable.Configure(LoadOrCreate<ScaleStepSettings>(ScaleStepSettingsPath));
-            scalable.IgnoreForRoomCheck(plate.GetComponent<Collider>(), button.GetComponent<Collider>());
+            scalable.IgnoreForRoomCheck(loadPan.GetComponent<Collider>());
 
-            var settings = LoadOrCreate<PressurePlateSettings>(PlateSettingsPath);
-            // Mass readout on the tilted face of the scale console in front of the plate (see LabDecor).
-            Quaternion consoleFace = Quaternion.Euler(LabDecor.ConsoleTilt, 0f, 0f);
-            var readout = LabText.Create("Weight Readout", "", LabDecor.ConsoleFace + consoleFace * Vector3.back * 0.012f,
-                0.62f, Color.white);
-            readout.transform.rotation = consoleFace;
-            route.pressurePlate.ConfigureReadout(settings, readout, scalable);
-
-            // Green mark beside the button: its top edge stops inside the mark when the mass is in the window.
-            float buttonTop = button.transform.position.y + button.transform.localScale.y * 0.5f;
-            float low = buttonTop + settings.RiseFor(settings.MaxMass);
-            float high = buttonTop + settings.RiseFor(settings.MinMass);
-            var mark = CreateBlock("Scale Window Mark",
-                new Vector3(center.x, (low + high) * 0.5f, center.z - 0.335f),
-                new Vector3(0.72f, high - low, 0.012f), Material("Scale Window", new Color(0.30f, 0.85f, 0.45f)));
-            UnityEngine.Object.DestroyImmediate(mark.GetComponent<Collider>());
+            var readout = LabText.Create("Balance Readout", "", LabDecor.DialCenter + Vector3.back * 0.02f, 0.7f, Color.white);
+            var balance = root.AddComponent<BalanceScale>();
+            balance.Configure(LoadOrCreate<BalanceSettings>(BalanceSettingsPath), scalable, loadPan.transform,
+                riderPan.GetComponent<Collider>(), pivot, scaler, route.player, readout);
+            route.ConfigureBalance(balance);
         }
 
         static void ConfigureBoxGravity(WarehouseRoute route, BoxCollider dockZone)
@@ -287,8 +289,8 @@ namespace Warehouse.Editor
             var outline = LabDecor.Paint("Marker Outline", new Color(0.08f, 0.09f, 0.11f), "Unlit/Color");
             Transform eyes = route.player.Camera.transform;
             route.ConfigureMarkers(
-                Marker("Weight", route.weight, 0.25f, 0f, "Подбери массу гири", settings, eyes, arrow, outline),
-                Marker("Vent", route.vent, 0.2f, 0f, "Вентиляция", settings, eyes, arrow, outline),
+                Marker("Weight", route.weight, 0.12f, 0f, "Сделай гирю тяжелее себя", settings, eyes, arrow, outline),
+                Marker("Vent", route.vent, 0.35f, 0f, "Решётка — курок", settings, eyes, arrow, outline),
                 Marker("Box", route.box, 0.1f, 0.6f, "Ящик — в паз", settings, eyes, arrow, outline),
                 Marker("Exit", route.exitZone, 0.35f, 0f, "Выход", settings, eyes, arrow, outline),
                 GameObject.Find("Exit Door").GetComponent<Collider>());

@@ -23,9 +23,8 @@ namespace Warehouse.Editor
         public static readonly Color WallColor = new(0.93f, 0.89f, 0.78f);
         public static readonly Color PlatformColor = new(0.45f, 0.49f, 0.33f);
 
-        /// <summary>Centre and tilt of the scale console face that carries the mass readout.</summary>
-        public static readonly Vector3 ConsoleFace = new(-3.85f, 0.43f, -0.97f);
-        public const float ConsoleTilt = 38f;
+        /// <summary>Centre of the balance dial on the back wall that carries the mass readout.</summary>
+        public static readonly Vector3 DialCenter = new(-3.85f, 2.05f, 2.9f);
 
         public static void Build(WarehouseRoute route)
         {
@@ -42,7 +41,7 @@ namespace Warehouse.Editor
             ShelfProps();
             Vent();
             ExitDoor();
-            SignBoards();
+            BalanceDial();
             DockHanger();
             Weight(route.weight.transform);
             Crate(route.box.transform);
@@ -59,7 +58,7 @@ namespace Warehouse.Editor
         static void MarkStatic(Transform node, HashSet<GameObject> skip)
         {
             GameObject go = node.gameObject;
-            if (skip.Contains(go) || go.GetComponent<TMP_Text>() != null || go.GetComponent<ObjectiveMarker>() != null || go.GetComponent<Canvas>() != null ||
+            if (skip.Contains(go) || go.GetComponent<TMP_Text>() != null || go.GetComponent<ObjectiveMarker>() != null || go.GetComponent<BalanceScale>() != null || go.GetComponent<Canvas>() != null ||
                 go.GetComponent<Unity.XR.CoreUtils.XROrigin>() != null || go.GetComponent<Rigidbody>() != null)
                 return;
 
@@ -308,7 +307,7 @@ namespace Warehouse.Editor
         // Familiar small things on the shelf: they look huge when the player is 10 % tall.
         static void ShelfProps()
         {
-            // Real sizes, placed on the left of the arrival point (-1.1, 1.0), out of the view towards the box.
+            // Real sizes, placed on the left of the arrival point (-0.8, 0.95), out of the view towards the box.
             var parent = Group("Shelf Props");
             const float top = 1.65f;
             var lying = Quaternion.Euler(0f, 35f, 90f);
@@ -338,9 +337,12 @@ namespace Warehouse.Editor
 
         static void Vent()
         {
+            // The vent mouth reads as a dark opening behind the grate.
+            var recess = GameObject.Find("Vent Recess");
+            if (recess != null)
+                recess.GetComponent<MeshRenderer>().sharedMaterial = iron;
             var parent = Group("Vent Dressing");
-            Block("Vent Shadow", new Vector3(-3.85f, 0.44f, 2.664f), new Vector3(0.84f, 0.76f, 0.01f), iron, parent);
-            Block("Vent Lintel", new Vector3(-3.85f, 0.985f, 2.15f), new Vector3(1.24f, 0.03f, 0.03f), trim, parent);
+            Block("Vent Lintel", new Vector3(-3.3f, 1.815f, 2.79f), new Vector3(0.86f, 0.03f, 0.03f), trim, parent);
         }
 
         static void ExitDoor()
@@ -353,16 +355,12 @@ namespace Warehouse.Editor
             Block("Exit Sign Back", new Vector3(4.02f, 3.82f, 2.39f), new Vector3(0.62f, 0.24f, 0.03f), signBack, parent);
         }
 
-        // Scale console in front of the plate; its tilted dark face carries the mass readout.
-        static void SignBoards()
+        // Dark dial plate above the balance; DayTwoScene puts the live readout on it.
+        static void BalanceDial()
         {
-            var parent = Group("Scale Console");
-            var tilt = Quaternion.Euler(ConsoleTilt, 0f, 0f);
-            Block("Console Body", new Vector3(ConsoleFace.x, 0.17f, ConsoleFace.z + 0.03f), new Vector3(0.92f, 0.34f, 0.2f), iron, parent);
-            var face = Block("Console Face", ConsoleFace, new Vector3(0.92f, 0.3f, 0.02f), signBoard, parent);
-            face.transform.localRotation = tilt;
-            var rim = Block("Console Rim", ConsoleFace + tilt * Vector3.forward * 0.012f, new Vector3(0.96f, 0.34f, 0.01f), trim, parent);
-            rim.transform.localRotation = tilt;
+            var parent = Group("Balance Dial");
+            Block("Dial Rim", DialCenter + Vector3.forward * 0.008f, new Vector3(1.0f, 0.38f, 0.01f), trim, parent);
+            Block("Dial Face", DialCenter, new Vector3(0.96f, 0.34f, 0.02f), signBoard, parent);
         }
 
         // The rod that holds the dock becomes an iron pipe with a flange at the ceiling.
